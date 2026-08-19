@@ -1,0 +1,40 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { exportBusinessPdf, exportBusinessWord, type BusinessExport } from "../lib/business-exports";
+
+const TOPICS = [
+  { id: "start", title: "Empezar a trabajar", summary: "El orden correcto para usar Volia por primera vez.", steps: ["Abra Catálogo y revise los productos, costos, marcas y precios.", "Abra Cotizador y cree la oferta comercial.", "Guarde o descargue la oferta en PDF o Word.", "Cuando se realice la cirugía, regístrela en Cirugías y cobros.", "Registre entradas, salidas y pérdidas desde Estadísticas.", "Al terminar la jornada, descargue un respaldo."] },
+  { id: "quote", title: "Crear una cotización", summary: "Cómo generar una oferta sin omitir información.", steps: ["Pulse Nueva cotización desde Inicio.", "Complete cliente, hospital, contacto y contrato.", "Seleccione cada producto del catálogo. Confirme marca y procedencia.", "Ingrese el costo interno. Este dato no aparece en el documento del cliente.", "Revise la advertencia de margen. No envíe una oferta con costos pendientes.", "Configure descuento, IVA, entrega y forma de pago.", "Descargue PDF o Word y revise el archivo antes de enviarlo."] },
+  { id: "case", title: "Registrar una cirugía y controlar el cobro", summary: "Seguimiento desde la cirugía hasta el pago.", steps: ["Pulse Registrar cirugía.", "Escriba paciente, fecha, hospital, contrato, factura y valor.", "Marque solamente los documentos que realmente recibió.", "Registre el valor cobrado si existe un abono.", "Actualice el estado a medida que avanza el trámite.", "Cuando se pague, márquelo como Pagada o registre el cobro desde Finanzas."] },
+  { id: "inventory", title: "Controlar inventario", summary: "Existencias, reservas, lotes y caducidades.", steps: ["Registre cada producto o lote por separado.", "Use Reservado cuando el material esté destinado a una cirugía.", "Registre entradas y salidas desde Estadísticas para conservar trazabilidad.", "No use Ajuste para una venta o cirugía: elija el tipo real de movimiento.", "Revise semanalmente stock bajo y caducidad menor a 120 días."] },
+  { id: "finance", title: "Usar el centro financiero", summary: "Caja, cuentas por cobrar, pagos y obligaciones.", steps: ["Configure saldo inicial, meta de ventas y presupuesto mensual.", "Importe las cirugías pendientes para crear cuentas por cobrar.", "Registre compras, gastos, ventas y servicios con su documento.", "Confirme IVA y retenciones con el comprobante real.", "Marque cobrado o pagado únicamente cuando el dinero se haya acreditado.", "Revise semanalmente las pestañas CxC y CxP, Presupuesto y Tributario."] },
+  { id: "audit", title: "Auditar documentos", summary: "Lectura OCR con revisión humana obligatoria.", steps: ["Cargue hasta 6 archivos PDF o imagen; máximo 20 MB en total.", "Marque la autorización para revisar esos documentos.", "Ejecute la auditoría y espere a que termine el OCR.", "Revise nombres, fechas, códigos, cantidades y valores contra el original.", "Corrija el documento de origen si hay diferencias.", "Exporte el informe. El resultado ayuda a revisar, pero no reemplaza la aprobación humana."] },
+  { id: "backup", title: "Guardar y recuperar un respaldo", summary: "Protección de la información local.", steps: ["Pulse Instalar y respaldar en la parte superior.", "Seleccione Descargar respaldo.", "Guarde el archivo en una carpeta segura y, de ser posible, en una unidad externa cifrada.", "Para recuperar datos, pulse Restaurar y seleccione el archivo de respaldo.", "Compruebe los totales después de restaurar.", "Haga un respaldo al final de cada jornada y antes de cambiar de computadora."] },
+];
+
+const GLOSSARY = [
+  ["Stock físico", "Cantidad que realmente existe en bodega."],
+  ["Reservado", "Cantidad separada para una cirugía y que no debe venderse."],
+  ["Disponible", "Stock físico menos la cantidad reservada."],
+  ["Margen", "Porcentaje de la venta que queda después del costo."],
+  ["Cuenta por cobrar", "Dinero que un cliente o entidad todavía debe a Volia."],
+  ["Cuenta por pagar", "Dinero que Volia todavía debe a un proveedor."],
+  ["OCR", "Lectura automática del texto de una fotografía o PDF escaneado."],
+];
+
+export default function HelpCenter() {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState("start");
+  const visible = useMemo(() => TOPICS.filter((topic) => `${topic.title} ${topic.summary} ${topic.steps.join(" ")}`.toLowerCase().includes(query.toLowerCase())), [query]);
+  const payload = (): BusinessExport => ({ title: "GUÍA DE USO DE VOLIA CONTROL", subtitle: "Procedimientos básicos para operación segura", reference: "Versión 1.0 · Agosto 2026", paragraphs: ["Esta guía explica el orden correcto para cotizar, registrar cirugías, controlar inventario, revisar finanzas y proteger la información."], tables: TOPICS.map((topic) => ({ title: topic.title, headers: ["Paso", "Instrucción"], rows: topic.steps.map((step, index) => [index + 1, step]) })), afterword: ["Regla principal: si un valor no coincide con el documento original, no continúe hasta corregirlo.", "Descargue un respaldo al finalizar cada jornada.", "El OCR y los indicadores son ayudas; la aprobación final siempre corresponde a una persona autorizada."], disclaimer: "Guía operativa de VOLIA S.A.S. Adapte los procedimientos a las políticas internas y obligaciones legales vigentes." });
+
+  return <section className="business-module help-center">
+    <div className="module-hero"><div><p className="eyebrow">AYUDA PASO A PASO</p><h2>Guía de uso de Volia Control</h2><p>Instrucciones sencillas, en el orden correcto y con advertencias para evitar errores.</p></div><div className="hero-actions"><button className="secondary-button" onClick={() => exportBusinessPdf(payload(), "guia-volia-control")}>Descargar PDF</button><button className="secondary-button" onClick={() => exportBusinessWord(payload(), "guia-volia-control")}>Descargar Word</button><button className="primary-button" onClick={() => window.print()}>Imprimir guía</button></div></div>
+    <div className="help-warning"><strong>Antes de comenzar</strong><span>Volia guarda la información en esta computadora. No cierre ni borre los datos del navegador sin descargar primero un respaldo.</span></div>
+    <label className="help-search"><span>¿Qué necesita aprender?</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ejemplo: cotización, inventario, respaldo..." /></label>
+    <div className="help-layout"><nav aria-label="Temas de ayuda">{visible.map((topic) => <button className={open === topic.id ? "active" : ""} key={topic.id} onClick={() => setOpen(topic.id)}><strong>{topic.title}</strong><small>{topic.summary}</small></button>)}</nav><section className="help-content">{visible.filter((topic) => topic.id === open || visible.length === 1).slice(0,1).map((topic) => <article key={topic.id}><p className="eyebrow">PROCEDIMIENTO</p><h3>{topic.title}</h3><p>{topic.summary}</p><ol>{topic.steps.map((step, index) => <li key={step}><span>{index + 1}</span><strong>{step}</strong></li>)}</ol></article>)}{!visible.length && <div className="module-empty">No se encontró ese tema. Pruebe con “cotización”, “inventario” o “respaldo”.</div>}</section></div>
+    <section className="business-card glossary"><div className="section-heading"><div><p className="eyebrow">PALABRAS IMPORTANTES</p><h3>Glosario rápido</h3></div></div><div>{GLOSSARY.map(([term, definition]) => <article key={term}><strong>{term}</strong><span>{definition}</span></article>)}</div></section>
+    <section className="safety-checklist"><h3>Lista obligatoria antes de terminar</h3><label><input type="checkbox" /> Revisé nombres, fechas, códigos y valores.</label><label><input type="checkbox" /> Confirmé que los documentos exportados se abren correctamente.</label><label><input type="checkbox" /> Actualicé pagos, existencias y documentos recibidos.</label><label><input type="checkbox" /> Descargué el respaldo del día.</label></section>
+  </section>;
+}

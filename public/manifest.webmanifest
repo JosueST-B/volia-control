@@ -1,0 +1,15 @@
+{
+  "name": "Volia Control",
+  "short_name": "Volia Control",
+  "description": "Control comercial, documental, operativo e inventario para Volia S.A.S.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f8f7",
+  "theme_color": "#102d29",
+  "lang": "es-EC",
+  "categories": ["business", "productivity", "medical"],
+  "icons": [
+    { "src": "/app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
