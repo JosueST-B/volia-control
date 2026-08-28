@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { getMemorySummary, type MemorySummary } from "../lib/volia-memory";
 import { BACKUP_KEYS, isValidBackupValue, STORAGE_KEYS } from "../lib/storage";
 import { businessIsoDate } from "../lib/date-utils";
+import { recordActivity } from "../lib/activity-log";
 
 type InstallPrompt = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> };
 
@@ -52,8 +53,10 @@ export default function InstallManager() {
     });
     const blob = new Blob([JSON.stringify({ product: "Volia Control", version: 2, exportedAt: new Date().toISOString(), data }, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob); const link = document.createElement("a");
-    link.href = url; link.download = `respaldo-volia-${businessIsoDate()}.json`; link.click(); URL.revokeObjectURL(url);
+    const fileName = `respaldo-volia-${businessIsoDate()}.json`;
+    link.href = url; link.download = fileName; link.click(); URL.revokeObjectURL(url);
     localStorage.setItem("volia-last-backup-v1", new Date().toISOString()); setMemory(getMemorySummary()); setMessage("Respaldo completo descargado.");
+    recordActivity("Respaldos", "Copia de seguridad descargada", `Archivo ${fileName} generado con éxito`, "system");
   };
 
   const importBackup = async (file?: File) => {
@@ -66,6 +69,7 @@ export default function InstallManager() {
       if (!validEntries.length) throw new Error();
       validEntries.forEach(([key, value]) => localStorage.setItem(key, value));
       localStorage.setItem(STORAGE_KEYS.memoryUpdated, new Date().toISOString());
+      recordActivity("Respaldos", "Copia de seguridad restaurada", `${validEntries.length} módulo(s) de datos recuperados desde archivo`, "system");
       setMessage("Respaldo restaurado. Recargando la aplicación…"); window.setTimeout(() => window.location.reload(), 700);
     } catch { setMessage("El archivo no es un respaldo válido de Volia Control."); }
   };
@@ -73,12 +77,19 @@ export default function InstallManager() {
   const savePin = async () => {
     if (!/^\d{4,8}$/.test(pin)) return setMessage("El PIN debe contener entre 4 y 8 números.");
     localStorage.setItem("volia-pin-hash-v1", await hashPin(pin)); setHasPin(true); setPin(""); setMessage("PIN local configurado.");
+    recordActivity("Seguridad", "PIN local configurado", "Bloqueo de acceso activado", "system");
   };
   const unlock = async () => {
-    if (await hashPin(pin) === localStorage.getItem("volia-pin-hash-v1")) { setLocked(false); setPin(""); setMessage(""); }
+    if (await hashPin(pin) === localStorage.getItem("volia-pin-hash-v1")) {
+      setLocked(false); setPin(""); setMessage("");
+      recordActivity("Seguridad", "Aplicación desbloqueada", "Acceso concedido mediante PIN", "system");
+    }
     else setMessage("PIN incorrecto.");
   };
-  const removePin = () => { localStorage.removeItem("volia-pin-hash-v1"); setHasPin(false); setLocked(false); setPin(""); setMessage("Bloqueo local desactivado."); };
+  const removePin = () => {
+    localStorage.removeItem("volia-pin-hash-v1"); setHasPin(false); setLocked(false); setPin(""); setMessage("Bloqueo local desactivado.");
+    recordActivity("Seguridad", "PIN local desactivado", "Bloqueo de acceso removido", "system");
+  };
 
   if (locked) return <div className="app-lock"><div className="lock-card"><div className="lock-logo">V</div><p className="eyebrow">ACCESO PROTEGIDO</p><h1>Volia Control</h1><p>Ingrese el PIN local para acceder a la información comercial y operativa de este dispositivo.</p><input autoFocus inputMode="numeric" type="password" value={pin} maxLength={8} placeholder="PIN de acceso" onChange={(event) => setPin(event.target.value.replace(/\D/g, ""))} onKeyDown={(event) => event.key === "Enter" && unlock()} /><button className="primary-button" onClick={unlock}>Desbloquear aplicación</button>{message && <small>{message}</small>}</div></div>;
 

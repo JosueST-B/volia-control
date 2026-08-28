@@ -158,6 +158,7 @@ export default function QuoteBuilder() {
     const next = { ...INITIAL_META, number: nextQuoteNumber(), date: today() };
     setMeta(next); setItems(INITIAL_ITEMS.map((item) => ({ ...item })));
     localStorage.removeItem(STORAGE_KEYS.quoteDraft);
+    recordActivity("Cotizador", "Nueva oferta iniciada", "Borrador de cotización reiniciado", "create");
   };
 
   const exportCsv = () => {
@@ -168,6 +169,7 @@ export default function QuoteBuilder() {
       [], ["Subtotal bruto", totals.grossSubtotal], ["Descuento", totals.discount], ["Venta neta sin IVA", totals.netSubtotal], ["Costo real", totals.totalCost], ["Utilidad", totals.profit], ["Margen %", totals.margin], ["Aplica IVA 15 %", meta.applyVat ? "Sí" : "No"], ["IVA", totals.iva], ["Total", totals.total],
     ];
     downloadCsv(rows, `${meta.number || "cotizacion-volia"}.csv`);
+    recordActivity("Cotizador", "Oferta exportada en CSV", `${meta.number || "Sin número"} · ${meta.customer || "Cliente por definir"} · ${items.length} productos`, "export");
   };
 
   const sharedBrand = new Set(items.map((item) => item.brand.trim()).filter(Boolean));
@@ -206,7 +208,7 @@ export default function QuoteBuilder() {
       savedAt: new Date().toISOString(),
       data: { meta, items, totals },
     });
-    recordActivity("Cotizador", "Oferta guardada", `${meta.number || "Sin número"} · ${meta.customer || "Cliente por definir"} · ${money(totals.total)}`);
+    recordActivity("Cotizador", "Oferta guardada", `${meta.number || "Sin número"} · ${meta.customer || "Cliente por definir"} · ${money(totals.total)}`, "create");
     setSavedQuotes(getSavedQuotes());
     setMemoryMessage("Oferta guardada en Memoria Volia");
     window.setTimeout(() => setMemoryMessage(""), 2200);
@@ -224,11 +226,13 @@ export default function QuoteBuilder() {
   const downloadPdf = async () => {
     archiveQuote();
     await exportQuotePdf(quotePdfPayload(), meta.number || "cotizacion-volia");
+    recordActivity("Cotizador", "Oferta exportada en PDF", `${meta.number || "Sin número"} · ${meta.customer || "Cliente por definir"} · ${money(totals.total)}`, "export");
   };
 
   const downloadWord = async () => {
     archiveQuote();
     await exportBusinessWord(exportPayload(), meta.number || "cotizacion-volia");
+    recordActivity("Cotizador", "Oferta exportada en Word", `${meta.number || "Sin número"} · ${meta.customer || "Cliente por definir"} · ${money(totals.total)}`, "export");
   };
 
   const restoreQuote = (saved: StoredQuote) => {
@@ -237,6 +241,7 @@ export default function QuoteBuilder() {
     setMeta({ ...INITIAL_META, ...snapshot.meta });
     setItems(snapshot.items.map((item) => ({ brand: "", origin: "", ...item })));
     setMemoryMessage(`Oferta ${saved.number || "sin número"} abierta`);
+    recordActivity("Cotizador", "Oferta restaurada", `${saved.number || "Sin número"} · ${saved.customer || "Cliente"}`, "update");
     window.scrollTo({ top: 0, behavior: "smooth" });
     window.setTimeout(() => setMemoryMessage(""), 2200);
   };
@@ -244,6 +249,7 @@ export default function QuoteBuilder() {
   const deleteSavedQuote = (saved: StoredQuote) => {
     if (!window.confirm(`¿Eliminar de la memoria la oferta ${saved.number || "sin número"}?`)) return;
     setSavedQuotes(removeQuoteFromMemory(saved.savedAt));
+    recordActivity("Cotizador", "Oferta eliminada", `${saved.number || "Sin número"} · ${saved.customer || "Cliente"}`, "delete");
   };
 
   return (
@@ -337,7 +343,7 @@ export default function QuoteBuilder() {
             <div className="quote-total"><dt>Total ofertado</dt><dd>{money(totals.total)}</dd></div>
           </dl>
           {!totals.missingCosts && totals.recommendedSubtotal > totals.netSubtotal + .01 && <div className="price-advice"><span>Venta neta mínima recomendada</span><strong>{money(totals.recommendedSubtotal)}</strong><small>Después del descuento y antes del IVA, aumente la oferta en {money(totals.recommendedSubtotal - totals.netSubtotal)} para alcanzar un margen de {meta.minimumMargin.toFixed(1)} %.</small></div>}
-          <div className="quote-actions"><button className="primary-button" onClick={downloadPdf}><SmallIcon name="download" />Descargar PDF</button><button className="secondary-button" onClick={downloadWord}><SmallIcon name="download" />Descargar Word</button><button className="secondary-button" onClick={archiveQuote}><SmallIcon name="check" />Guardar oferta</button><button className="secondary-button" onClick={() => window.print()}><SmallIcon name="print" />Imprimir</button><button className="secondary-button" onClick={() => { archiveQuote(); exportCsv(); }}><SmallIcon name="download" />Exportar Excel/CSV</button></div>
+          <div className="quote-actions"><button className="primary-button" onClick={downloadPdf}><SmallIcon name="download" />Descargar PDF</button><button className="secondary-button" onClick={downloadWord}><SmallIcon name="download" />Descargar Word</button><button className="secondary-button" onClick={archiveQuote}><SmallIcon name="check" />Guardar oferta</button><button className="secondary-button" onClick={() => { window.print(); recordActivity("Cotizador", "Oferta impresa", `${meta.number || "Sin número"} · ${meta.customer || "Cliente"}`, "export"); }}><SmallIcon name="print" />Imprimir</button><button className="secondary-button" onClick={() => { archiveQuote(); exportCsv(); }}><SmallIcon name="download" />Exportar Excel/CSV</button></div>
           {memoryMessage && <p className="memory-confirmation">{memoryMessage}</p>}
           <p className="privacy-copy">Los costos y el margen solo aparecen en este panel interno; no se muestran en la cotización para el cliente.</p>
         </aside>

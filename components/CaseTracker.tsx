@@ -114,20 +114,35 @@ export default function CaseTracker() {
     setShowForm(false);
   };
 
-  const setStatus = (id: string, status: WorkflowStatus) => { const target = records.find((record) => record.id === id); setRecords((current) => current.map((record) => record.id === id ? { ...record, status, paidAmount: status === "paid" ? record.amount : record.status === "paid" ? 0 : record.paidAmount } : record)); if (target) recordActivity("Cirugías", "Estado actualizado", `${target.patient} · ${STATUS[status].label}`); };
-  const markDocument = (id: string, key: keyof CaseRecord["documents"]) => setRecords((current) => current.map((record) => record.id === id ? { ...record, documents: { ...record.documents, [key]: !record.documents[key] } } : record));
+  const setStatus = (id: string, status: WorkflowStatus) => { const target = records.find((record) => record.id === id); setRecords((current) => current.map((record) => record.id === id ? { ...record, status, paidAmount: status === "paid" ? record.amount : record.status === "paid" ? 0 : record.paidAmount } : record)); if (target) recordActivity("Cirugías", "Estado actualizado", `${target.patient} · ${STATUS[status].label}`, "update"); };
+  const markDocument = (id: string, key: keyof CaseRecord["documents"]) => {
+    const target = records.find((record) => record.id === id);
+    setRecords((current) => current.map((record) => record.id === id ? { ...record, documents: { ...record.documents, [key]: !record.documents[key] } } : record));
+    if (target) recordActivity("Cirugías", "Checklist actualizado", `${target.patient} · Documento modificado`, "update");
+  };
   const editCase = (record: CaseRecord) => { setDraft({ ...record, documents: { ...record.documents } }); setShowForm(true); window.scrollTo({ top: 0, behavior: "smooth" }); };
-  const deleteCase = (id: string) => { const target = records.find((record) => record.id === id); if (window.confirm("¿Eliminar definitivamente este caso y su seguimiento?")) { setRecords((current) => current.filter((record) => record.id !== id)); if (target) recordActivity("Cirugías", "Expediente eliminado", target.patient); } };
+  const deleteCase = (id: string) => { const target = records.find((record) => record.id === id); if (window.confirm("¿Eliminar definitivamente este caso y su seguimiento?")) { setRecords((current) => current.filter((record) => record.id !== id)); if (target) recordActivity("Cirugías", "Expediente eliminado", target.patient, "delete"); } };
 
   const exportCsv = () => {
     const rows = [["Paciente", "Hospital", "Cirugía", "Responsable", "Contrato", "Factura", "Valor", "Cobrado", "Pendiente", "Estado", "Vencimiento"], ...enriched.map((record) => [record.patient, record.hospital, record.surgeryDate, record.responsible.name, record.contract, record.invoice, record.amount, record.paidAmount, record.pending, STATUS[record.status].label, record.dueDate])];
     downloadCsv(rows, `control-volia-${today()}.csv`);
+    recordActivity("Cirugías", "Expedientes exportados en CSV", `${enriched.length} caso(s) exportado(s)`, "export");
   };
 
   const exportPayload = (): BusinessExport => ({ title: "Control de cirugías, facturación y cobros", subtitle: `Reporte operativo al ${dateLabel(today())}`, metadata: [["Casos registrados", enriched.length], ["Expedientes incompletos", kpis.incomplete], ["Cobros vencidos", kpis.overdue], ["Valor cobrado", money(kpis.collected)], ["Valor pendiente", money(kpis.pending)]], tables: [{ title: "Seguimiento de expedientes", headers: ["Paciente", "Hospital", "Cirugía", "Factura", "Estado", "Valor", "Pendiente"], rows: enriched.map((record) => [record.patient, record.hospital, dateLabel(record.surgeryDate), record.invoice || "Sin factura", record.overdue ? "Cobro vencido" : STATUS[record.status].label, money(record.amount), money(record.pending)]) }], disclaimer: "Reporte institucional de VOLIA S.A.S. Confirme los registros contra los expedientes y comprobantes originales." });
 
+  const exportPdf = () => {
+    exportBusinessPdf(exportPayload(), `cirugias-cobros-${today()}`);
+    recordActivity("Cirugías", "Expedientes exportados en PDF", `${enriched.length} caso(s) exportado(s)`, "export");
+  };
+
+  const exportWord = () => {
+    exportBusinessWord(exportPayload(), `cirugias-cobros-${today()}`);
+    recordActivity("Cirugías", "Expedientes exportados en Word", `${enriched.length} caso(s) exportado(s)`, "export");
+  };
+
   return <section className="case-module">
-    <div className="case-hero"><div><p className="eyebrow">CONTROL OPERATIVO</p><h2>Cirugías, facturación y cobros</h2><p>Centraliza cada caso, detecta documentos pendientes y vigila el dinero por cobrar.</p></div><div className="case-actions export-actions"><button className="secondary-button" onClick={() => exportBusinessPdf(exportPayload(), `cirugias-cobros-${today()}`)}>PDF</button><button className="secondary-button" onClick={() => exportBusinessWord(exportPayload(), `cirugias-cobros-${today()}`)}>Word</button><button className="secondary-button" onClick={exportCsv}>Excel/CSV</button><button className="primary-button" onClick={() => setShowForm((value) => !value)}>{showForm ? "Cerrar registro" : "+ Registrar cirugía"}</button></div></div>
+    <div className="case-hero"><div><p className="eyebrow">CONTROL OPERATIVO</p><h2>Cirugías, facturación y cobros</h2><p>Centraliza cada caso, detecta documentos pendientes y vigila el dinero por cobrar.</p></div><div className="case-actions export-actions"><button className="secondary-button" onClick={exportPdf}>PDF</button><button className="secondary-button" onClick={exportWord}>Word</button><button className="secondary-button" onClick={exportCsv}>Excel/CSV</button><button className="primary-button" onClick={() => setShowForm((value) => !value)}>{showForm ? "Cerrar registro" : "+ Registrar cirugía"}</button></div></div>
 
     <div className="case-kpis">
       <article><span>POR COBRAR</span><strong>{money(kpis.pending)}</strong><small>Valor aún no recuperado</small></article>

@@ -426,6 +426,7 @@ export default function FinanceCenter() {
       ]),
     ];
     downloadCsv(rows, `finanzas-volia-${today()}.csv`);
+    recordActivity("Finanzas", "Movimientos exportados en CSV", `${enriched.length} registros exportados`, "export");
   };
   const exportPayload = (): BusinessExport => ({
     title: "Informe financiero gerencial",
@@ -468,6 +469,16 @@ export default function FinanceCenter() {
       "Reporte gerencial de VOLIA S.A.S. No sustituye la contabilidad, conciliación bancaria ni declaración tributaria oficial.",
   });
 
+  const exportPdf = () => {
+    exportBusinessPdf(exportPayload(), "informe-financiero-volia");
+    recordActivity("Finanzas", "Informe financiero exportado en PDF", `Resumen financiero al ${dateLabel(today())}`, "export");
+  };
+
+  const exportWord = () => {
+    exportBusinessWord(exportPayload(), "informe-financiero-volia");
+    recordActivity("Finanzas", "Informe financiero exportado en Word", `Resumen financiero al ${dateLabel(today())}`, "export");
+  };
+
   const viewLabels: Array<[FinanceView, string]> = [
     ["overview", "Resumen"],
     ["ledger", "Movimientos"],
@@ -489,17 +500,13 @@ export default function FinanceCenter() {
         <div className="hero-actions export-actions">
           <button
             className="secondary-button"
-            onClick={() =>
-              exportBusinessPdf(exportPayload(), "informe-financiero-volia")
-            }
+            onClick={exportPdf}
           >
             PDF
           </button>
           <button
             className="secondary-button"
-            onClick={() =>
-              exportBusinessWord(exportPayload(), "informe-financiero-volia")
-            }
+            onClick={exportWord}
           >
             Word
           </button>

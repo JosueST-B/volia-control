@@ -30,8 +30,10 @@ export default function ProductCatalog() {
   };
   const edit = (product: CatalogProduct) => { setDraft({ ...product }); setShowForm(true); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const toggle = (product: CatalogProduct) => { const next = products.map((entry) => entry.id === product.id ? { ...entry, active: !entry.active, updatedAt: new Date().toISOString() } : entry); setProducts(next); saveCatalog(next); recordActivity("Catálogo", product.active ? "Producto desactivado" : "Producto activado", product.code); };
-  const remove = (product: CatalogProduct) => { if (!window.confirm(`¿Eliminar ${product.description} del catálogo? Las cotizaciones anteriores no se borrarán.`)) return; const next = products.filter((entry) => entry.id !== product.id); setProducts(next); saveCatalog(next); recordActivity("Catálogo", "Producto eliminado", `${product.code} · ${product.description}`); };
-  const exportCsv = () => downloadCsv([["Código", "Descripción", "Marca", "Procedencia", "Categoría", "Costo", "Precio de venta", "Margen %", "Activo"], ...products.map((product) => [product.code, product.description, product.brand, product.origin, product.category, product.unitCost, product.salePrice, margin(product).toFixed(2), product.active ? "Sí" : "No"])], "catalogo-maestro-volia.csv");
+  const exportCsv = () => {
+    downloadCsv([["Código", "Descripción", "Marca", "Procedencia", "Categoría", "Costo", "Precio de venta", "Margen %", "Activo"], ...products.map((product) => [product.code, product.description, product.brand, product.origin, product.category, product.unitCost, product.salePrice, margin(product).toFixed(2), product.active ? "Sí" : "No"])], "catalogo-maestro-volia.csv");
+    recordActivity("Catálogo", "Catálogo exportado en CSV", `${products.length} producto(s) exportado(s)`, "export");
+  };
 
   return <section className="business-module catalog-module">
     <div className="module-hero"><div><p className="eyebrow">DATOS MAESTROS</p><h2>Catálogo de productos y precios</h2><p>Configure una sola vez los códigos, marcas, procedencias, costos y precios que aparecerán en el cotizador.</p></div><div className="hero-actions"><button className="secondary-button" onClick={exportCsv}>Exportar Excel/CSV</button><button className="primary-button" onClick={() => showForm ? close() : setShowForm(true)}>{showForm ? "Cerrar" : "+ Agregar producto"}</button></div></div>

@@ -22,6 +22,7 @@ import {
 } from "../lib/business-exports";
 import { VOLIA_LOGO_DATA_URL } from "../lib/volia-logo";
 import { downloadCsv } from "../lib/csv";
+import { recordActivity } from "../lib/activity-log";
 
 type AuditState = "ready" | "processing" | "complete";
 type Module =
@@ -312,6 +313,12 @@ export default function Home() {
       setResult(data);
       setState("complete");
       setProgress("");
+      recordActivity(
+        "Auditor",
+        "Auditoría completada",
+        `${data.extracted.patient_name || "Sin paciente"} · ${data.extracted.items.length} ítem(s) · Score ${data.score}/100 · ${data.status === "approved" ? "Aprobado" : data.status === "error" ? "Inconsistencias" : "Por revisar"}`,
+        "audit"
+      );
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -329,6 +336,7 @@ export default function Home() {
     setError("");
     setResult(demoResult);
     setState("complete");
+    recordActivity("Auditor", "Demostración cargada", "Expediente de demostración", "audit");
   };
   const removeFile = (index: number) => {
     setFiles(files.filter((_, i) => i !== index));
@@ -349,6 +357,7 @@ export default function Home() {
       ]),
     ];
     downloadCsv(rows, `auditoria-${result.extracted.patient_name ?? "volia"}.csv`);
+    recordActivity("Auditor", "Reporte CSV exportado", `${result.extracted.patient_name || "Expediente"} · ${result.extracted.items.length} ítems`, "export");
   };
 
   const auditPayload = (): BusinessExport | null =>
@@ -992,11 +1001,13 @@ export default function Home() {
                         className="secondary-button"
                         onClick={() => {
                           const payload = auditPayload();
-                          if (payload)
+                          if (payload) {
                             exportBusinessPdf(
                               payload,
                               `auditoria-${result.extracted.patient_name || "volia"}`,
                             );
+                            recordActivity("Auditor", "Reporte PDF exportado", `${result.extracted.patient_name || "Expediente"}`, "export");
+                          }
                         }}
                       >
                         <Icon name="download" />
@@ -1006,11 +1017,13 @@ export default function Home() {
                         className="secondary-button"
                         onClick={() => {
                           const payload = auditPayload();
-                          if (payload)
+                          if (payload) {
                             exportBusinessWord(
                               payload,
                               `auditoria-${result.extracted.patient_name || "volia"}`,
                             );
+                            recordActivity("Auditor", "Reporte Word exportado", `${result.extracted.patient_name || "Expediente"}`, "export");
+                          }
                         }}
                       >
                         <Icon name="download" />
@@ -1022,7 +1035,10 @@ export default function Home() {
                       </button>
                       <button
                         className="secondary-button"
-                        onClick={() => window.print()}
+                        onClick={() => {
+                          window.print();
+                          recordActivity("Auditor", "Reporte impreso", `${result.extracted.patient_name || "Expediente"}`, "export");
+                        }}
                       >
                         <Icon name="file" />
                         Imprimir

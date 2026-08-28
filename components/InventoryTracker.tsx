@@ -37,20 +37,40 @@ export default function InventoryTracker() {
   const adjust = (id: string, field: "stock" | "reserved", amount: number) => setItems((current) => current.map((item) => {
     if (item.id !== id) return item;
     const next = { ...item, [field]: Math.max(0, item[field] + amount) };
-    if (field === "stock") next.reserved = Math.min(next.reserved, next.stock);
-    if (field === "reserved") next.reserved = Math.min(next.reserved, next.stock);
-    if (field === "stock" && next.stock !== item.stock) {
-      try {
-        const saved = readStoredArray<StockMovement>(MOVEMENTS_KEY);
-        const movement: StockMovement = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, date: businessIsoDate(), type: amount > 0 ? "adjustment-in" : "adjustment-out", itemId: item.id, code: item.code, product: item.product, quantity: Math.abs(next.stock - item.stock), unitCost: item.unitCost, unitPrice: 0, note: "Ajuste rápido desde inventario" };
-        writeStoredJson(MOVEMENTS_KEY, [movement, ...saved]);
-      } catch { /* El ajuste de stock continúa aunque no se pueda guardar el historial. */ }
+    if (field === "stock") {
+      next.reserved = Math.min(next.reserved, next.stock);
+      if (next.stock !== item.stock) {
+        recordActivity("Inventario", "Stock ajustado", `${item.product} · ${amount > 0 ? "+" : ""}${amount} unidad(es) · Nuevo stock: ${next.stock}`, "update");
+        try {
+          const saved = readStoredArray<StockMovement>(MOVEMENTS_KEY);
+          const movement: StockMovement = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, date: businessIsoDate(), type: amount > 0 ? "adjustment-in" : "adjustment-out", itemId: item.id, code: item.code, product: item.product, quantity: Math.abs(next.stock - item.stock), unitCost: item.unitCost, unitPrice: 0, note: "Ajuste rápido desde inventario" };
+          writeStoredJson(MOVEMENTS_KEY, [movement, ...saved]);
+        } catch { /* El ajuste de stock continúa aunque no se pueda guardar el historial. */ }
+      }
+    }
+    if (field === "reserved") {
+      next.reserved = Math.min(next.reserved, next.stock);
+      if (next.reserved !== item.reserved) {
+        recordActivity("Inventario", "Reserva modificada", `${item.product} · Reservado: ${next.reserved} de ${next.stock}`, "update");
+      }
     }
     return next;
   }));
-  const exportCsv = () => { const rows = [["Código", "Producto", "Lote", "Caducidad", "Ubicación", "Stock", "Reservado", "Disponible", "Costo unitario"], ...enriched.map((item) => [item.code, item.product, item.lot, item.expiry, item.location, item.stock, item.reserved, item.available, item.unitCost])]; downloadCsv(rows, `inventario-volia-${businessIsoDate()}.csv`); };
+  const exportCsv = () => {
+    const rows = [["Código", "Producto", "Lote", "Caducidad", "Ubicación", "Stock", "Reservado", "Disponible", "Costo unitario"], ...enriched.map((item) => [item.code, item.product, item.lot, item.expiry, item.location, item.stock, item.reserved, item.available, item.unitCost])];
+    downloadCsv(rows, `inventario-volia-${businessIsoDate()}.csv`);
+    recordActivity("Inventario", "Inventario exportado en CSV", `${enriched.length} productos/lotes exportados`, "export");
+  };
   const exportPayload = (): BusinessExport => ({ title: "Inventario, lotes y caducidades", subtitle: `Reporte al ${new Date().toLocaleDateString("es-EC")}`, metadata: [["Productos / lotes", enriched.length], ["Unidades disponibles", kpis.available], ["Alertas de stock bajo", kpis.low], ["Caducidad menor a 120 días", kpis.expiring], ["Valor registrado", money(kpis.value)]], tables: [{ title: "Existencias", headers: ["Código", "Producto", "Lote", "Caducidad", "Stock", "Reservado", "Disponible"], rows: enriched.map((item) => [item.code, item.product, item.lot, item.expiry, item.stock, item.reserved, item.available]) }], disclaimer: "Reporte institucional de VOLIA S.A.S. Verifique existencias, lotes y caducidades mediante conteo físico." });
-  return <section className="business-module"><div className="module-hero"><div><p className="eyebrow">TRAZABILIDAD OPERATIVA</p><h2>Inventario, lotes y caducidades</h2><p>Controla existencias reales, material reservado, alertas de reposición y productos próximos a vencer.</p></div><div className="hero-actions export-actions"><button className="secondary-button" onClick={() => exportBusinessPdf(exportPayload(), "inventario-volia")}>PDF</button><button className="secondary-button" onClick={() => exportBusinessWord(exportPayload(), "inventario-volia")}>Word</button><button className="secondary-button" onClick={exportCsv}>Excel/CSV</button><button className="primary-button" onClick={() => show ? closeForm() : setShow(true)}>{show ? "Cerrar" : "+ Registrar producto"}</button></div></div>
+  const exportPdf = () => {
+    exportBusinessPdf(exportPayload(), "inventario-volia");
+    recordActivity("Inventario", "Inventario exportado en PDF", `${enriched.length} productos/lotes`, "export");
+  };
+  const exportWord = () => {
+    exportBusinessWord(exportPayload(), "inventario-volia");
+    recordActivity("Inventario", "Inventario exportado en Word", `${enriched.length} productos/lotes`, "export");
+  };
+  return <section className="business-module"><div className="module-hero"><div><p className="eyebrow">TRAZABILIDAD OPERATIVA</p><h2>Inventario, lotes y caducidades</h2><p>Controla existencias reales, material reservado, alertas de reposición y productos próximos a vencer.</p></div><div className="hero-actions export-actions"><button className="secondary-button" onClick={exportPdf}>PDF</button><button className="secondary-button" onClick={exportWord}>Word</button><button className="secondary-button" onClick={exportCsv}>Excel/CSV</button><button className="primary-button" onClick={() => show ? closeForm() : setShow(true)}>{show ? "Cerrar" : "+ Registrar producto"}</button></div></div>
     <div className="business-kpis"><article><span>VALOR EN INVENTARIO</span><strong>{money(kpis.value)}</strong><small>Según costos registrados</small></article><article><span>UNIDADES DISPONIBLES</span><strong>{kpis.available}</strong><small>Stock menos reservas</small></article><article className={kpis.low ? "warn" : ""}><span>STOCK BAJO</span><strong>{kpis.low}</strong><small>En mínimo o por debajo</small></article><article className={kpis.expiring ? "danger" : ""}><span>CADUCIDAD &lt; 120 DÍAS</span><strong>{kpis.expiring}</strong><small>Requieren priorización</small></article></div>
     {show && <section className="business-card"><div className="section-heading"><div><p className="eyebrow">{draft.id ? "EDICIÓN" : "NUEVO REGISTRO"}</p><h3>{draft.id ? "Corregir producto o lote" : "Producto o lote"}</h3></div></div><div className="business-form">{([['code','Código IESS'],['product','Producto *'],['lot','Lote / serie'],['expiry','Caducidad'],['location','Ubicación']] as const).map(([key,label]) => <label key={key}><span>{label}</span><input type={key === 'expiry' ? 'date' : 'text'} value={draft[key]} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })} /></label>)}{([['stock','Stock físico'],['reserved','Reservado'],['minimum','Mínimo'],['unitCost','Costo unitario']] as const).map(([key,label]) => <label key={key}><span>{label}</span><input type="number" min="0" step={key === 'unitCost' ? '.01' : '1'} value={draft[key] || ''} onChange={(e) => setDraft({ ...draft, [key]: Math.max(0, Number(e.target.value) || 0) })} /></label>)}</div><div className="form-end"><span>Los cambios quedan guardados en este dispositivo.</span><div className="record-actions"><button className="secondary-button" onClick={closeForm}>Cancelar</button><button className="primary-button" disabled={!draft.product.trim()} onClick={save}>{draft.id ? "Guardar cambios" : "Guardar producto"}</button></div></div></section>}
     <section className="business-card"><div className="section-heading"><div><p className="eyebrow">EXISTENCIAS</p><h3>Inventario registrado</h3></div><input className="module-search" placeholder="Buscar código, producto, lote o ubicación" value={query} onChange={(e) => setQuery(e.target.value)} /></div><div className="inventory-list">{visible.map((item) => <article className={`inventory-row ${item.low ? 'is-low' : ''}`} key={item.id}><div className="inventory-name"><span className={`status-dot ${item.low ? 'red' : item.expiryDays <= 120 ? 'yellow' : 'green'}`}></span><div><strong>{item.product}</strong><small>{item.code || 'Sin código'} · Lote {item.lot || 'no registrado'} · {item.location}</small></div></div><div className="inventory-metrics"><div><span>FÍSICO</span><strong>{item.stock}</strong></div><div><span>RESERVADO</span><strong>{item.reserved}</strong></div><div><span>DISPONIBLE</span><strong>{item.available}</strong></div><div><span>CADUCIDAD</span><strong>{item.expiry || 'Sin fecha'}</strong><small>{item.expiryDays <= 120 ? `${item.expiryDays} días` : 'Vigente'}</small></div></div><div className="stock-actions"><button onClick={() => adjust(item.id, 'stock', -1)}>− ajuste</button><button onClick={() => adjust(item.id, 'stock', 1)}>+ ajuste</button><button onClick={() => adjust(item.id, 'reserved', item.reserved ? -1 : 1)}>{item.reserved ? '− reserva' : '+ reserva'}</button><button onClick={() => edit(item)}>Editar</button><button className="danger-link" onClick={() => remove(item)}>Eliminar</button></div></article>)}{!visible.length && <div className="module-empty">No hay productos que coincidan con la búsqueda.</div>}</div></section>
