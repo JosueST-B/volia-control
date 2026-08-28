@@ -4276,3 +4276,44 @@ td {
     margin-bottom: 8px;
   }
 }
+
+/* Cloud Sync Styling */
+.cloud-sync-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #f0fdfa;
+  color: #0f766e;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.cloud-sync-trigger:hover {
+  background: #ccfbf1;
+  border-color: #5eead4;
+}
+.cloud-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.cloud-dot.green { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+.cloud-dot.yellow { background: #eab308; box-shadow: 0 0 6px #eab308; animation: pulse-sync 1.2s infinite; }
+.cloud-dot.red { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
+.cloud-dot.blue { background: #0ea5e9; }
+
+@keyframes pulse-sync {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.2); }
+}
+
+.cloud-action-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+

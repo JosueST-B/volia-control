@@ -10,6 +10,7 @@ import MovementAnalytics from "../components/MovementAnalytics";
 import FinanceCenter from "../components/FinanceCenter";
 import DocumentGenerator from "../components/DocumentGenerator";
 import InstallManager from "../components/InstallManager";
+import CloudSyncModal from "../components/CloudSyncModal";
 import HomeDashboard from "../components/HomeDashboard";
 import ProductCatalog from "../components/ProductCatalog";
 import HelpCenter from "../components/HelpCenter";
@@ -535,6 +536,7 @@ export default function Home() {
             <h1>{MODULE_INFO[module].title}</h1>
           </div>
           <div className="topbar-actions">
+            <CloudSyncModal />
             <AccessibilityToolbar onHelp={() => setModule("help")} />
             <InstallManager />
           </div>
