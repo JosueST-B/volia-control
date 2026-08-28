@@ -1,0 +1,183 @@
+.trigger {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid rgba(21, 111, 85, 0.28);
+  border-radius: 12px;
+  background: #eef8f3;
+  color: #0d5f47;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.trigger:hover,
+.trigger:focus-visible {
+  background: #dff2e9;
+  border-color: #16775a;
+  outline: none;
+}
+
+.modal {
+  width: min(820px, calc(100vw - 28px));
+}
+
+.securityBanner {
+  display: grid;
+  gap: 6px;
+  margin: 22px 0;
+  padding: 16px 18px;
+  border: 1px solid #b8dfcf;
+  border-radius: 14px;
+  background: #edf8f3;
+  color: #174f3e;
+}
+
+.securityBanner span,
+.passphrase small,
+.previewCard small {
+  line-height: 1.55;
+}
+
+.passphrase {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.passphrase label {
+  color: #17251f;
+  font-weight: 800;
+}
+
+.passphrase > div {
+  display: flex;
+  gap: 8px;
+}
+
+.passphrase input {
+  flex: 1;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid #aebdb6;
+  border-radius: 10px;
+  background: #fff;
+  color: #15201c;
+  font: inherit;
+}
+
+.passphrase input:focus {
+  border-color: #16775a;
+  box-shadow: 0 0 0 3px rgba(22, 119, 90, 0.14);
+  outline: none;
+}
+
+.actionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.actionGrid article {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-height: 220px;
+  padding: 18px;
+  border: 1px solid #d6dfda;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.actionGrid article p {
+  flex: 1;
+  line-height: 1.55;
+}
+
+.previewCard {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 18px;
+  border: 2px solid #16775a;
+  border-radius: 14px;
+  background: #f7fbf9;
+}
+
+.previewCard > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.previewCard > div:first-child span {
+  color: #39705f;
+  font-weight: 700;
+}
+
+.previewCard > div:first-child strong {
+  font-size: 1.2rem;
+  color: #0d5f47;
+}
+
+.previewCard dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.previewCard dl div {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #e9f4ef;
+}
+
+.previewCard dt {
+  color: #587066;
+  font-size: 0.78rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.previewCard dd {
+  margin: 4px 0 0;
+  color: #17251f;
+  font-weight: 800;
+}
+
+.notice {
+  display: grid;
+  gap: 7px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  line-height: 1.45;
+}
+
+.info { background: #eef3f7; color: #324958; }
+.success { background: #e6f5ed; color: #14583f; }
+.error { background: #fff0ee; color: #8a2d20; }
+
+.notice a {
+  color: inherit;
+  font-weight: 850;
+  text-decoration: underline;
+}
+
+@media (max-width: 720px) {
+  .actionGrid,
+  .previewCard dl {
+    grid-template-columns: 1fr;
+  }
+
+  .passphrase > div {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .trigger {
+    width: 100%;
+  }
+}

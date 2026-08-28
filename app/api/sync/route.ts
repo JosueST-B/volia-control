@@ -1,109 +1,288 @@
 import { NextResponse } from "next/server";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { getChatGPTUser } from "../../chatgpt-auth";
 
-interface SyncPayload {
-  product: string;
-  version: number;
-  timestamp: string;
-  deviceId: string;
-  encrypted: boolean;
-  data: Record<string, string>;
-  summary?: Record<string, number>;
-}
+export const dynamic = "force-dynamic";
 
-// Ubicación del archivo de persistencia en el servidor/nube
-const STORAGE_FILE = resolve(process.cwd(), ".wrangler", "cloud-sync-storage.json");
+const MAX_PAYLOAD_CHARS = 1_500_000;
+const MAX_DEVICE_ID_CHARS = 100;
 
-function getStoredSnapshot(): SyncPayload | null {
-  try {
-    if (!existsSync(STORAGE_FILE)) return null;
-    const content = readFileSync(STORAGE_FILE, "utf-8");
-    return JSON.parse(content) as SyncPayload;
-  } catch {
-    return null;
-  }
-}
+type SnapshotRow = {
+  revision: number;
+  encrypted_payload: string;
+  checksum: string;
+  device_id: string;
+  keys_count: number;
+  created_at: string;
+  updated_at: string;
+};
 
-function saveSnapshot(payload: SyncPayload): boolean {
-  try {
-    mkdirSync(dirname(STORAGE_FILE), { recursive: true });
-    writeFileSync(STORAGE_FILE, JSON.stringify(payload, null, 2), "utf-8");
-    return true;
-  } catch (err) {
-    console.error("Error al guardar snapshot en la nube:", err);
-    return false;
-  }
-}
-
-export async function GET() {
-  const snapshot = getStoredSnapshot();
-  if (!snapshot) {
-    return NextResponse.json(
-      {
-        status: "empty",
-        message: "No hay datos sincronizados en la nube todavía.",
-        timestamp: null,
-      },
-      { status: 200 }
-    );
-  }
-
-  return NextResponse.json(
-    {
-      status: "ok",
-      snapshot,
-      syncedAt: snapshot.timestamp,
-      encrypted: snapshot.encrypted,
+function json(body: unknown, status = 200) {
+  return NextResponse.json(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store, max-age=0",
+      "X-Content-Type-Options": "nosniff",
     },
-    { status: 200 }
+  });
+}
+
+function getDatabase() {
+  return (globalThis as typeof globalThis & { __VOLIA_DB__?: D1Database })
+    .__VOLIA_DB__;
+}
+
+async function authenticatedOwnerId() {
+  const user = await getChatGPTUser();
+  if (!user) return null;
+  const normalizedEmail = user.email.trim().toLowerCase();
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`volia-cloud:${normalizedEmail}`),
+  );
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
+function snapshotResponse(row: SnapshotRow) {
+  return {
+    revision: row.revision,
+    encrypted: true,
+    payload: row.encrypted_payload,
+    checksum: row.checksum,
+    deviceId: row.device_id,
+    keysCount: row.keys_count,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function validDeviceId(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length >= 8 &&
+    value.length <= MAX_DEVICE_ID_CHARS &&
+    /^[a-zA-Z0-9._:-]+$/.test(value)
   );
 }
 
-export async function POST(request: Request) {
-  try {
-    const body = (await request.json()) as SyncPayload;
+async function sha256(value: string) {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+}
 
-    if (!body || typeof body !== "object" || !body.data) {
-      return NextResponse.json(
-        { error: "Cuerpo de solicitud inválido para sincronización." },
-        { status: 400 }
-      );
-    }
-
-    const payload: SyncPayload = {
-      product: "Volia Control Cloud",
-      version: 2,
-      timestamp: new Date().toISOString(),
-      deviceId: body.deviceId || "unknown-device",
-      encrypted: Boolean(body.encrypted),
-      data: body.data,
-      summary: body.summary || {},
-    };
-
-    const saved = saveSnapshot(payload);
-    if (!saved) {
-      return NextResponse.json(
-        { error: "Error al persistir la información en la nube." },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      status: "success",
-      message: "Datos sincronizados y guardados en la nube exitosamente.",
-      timestamp: payload.timestamp,
-      modulesCount: Object.keys(payload.data).length,
-    });
-  } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Error interno del servidor de sincronización.",
-      },
-      { status: 500 }
+export async function GET(request: Request) {
+  const ownerId = await authenticatedOwnerId();
+  if (!ownerId) {
+    return json(
+      { error: "Inicie sesión para acceder a su respaldo.", code: "AUTH_REQUIRED" },
+      401,
     );
   }
+  const database = getDatabase();
+  if (!database) {
+    return json({ error: "El almacenamiento en la nube no está disponible." }, 503);
+  }
+
+  const requestedRevision = Number(new URL(request.url).searchParams.get("revision"));
+  const hasRequestedRevision =
+    Number.isSafeInteger(requestedRevision) && requestedRevision > 0;
+
+  const statement = hasRequestedRevision
+    ? database.prepare(
+        `SELECT revision, encrypted_payload, checksum, device_id, keys_count,
+                created_at, created_at AS updated_at
+           FROM cloud_snapshot_versions
+          WHERE owner_id = ? AND revision = ?
+          LIMIT 1`,
+      ).bind(ownerId, requestedRevision)
+    : database.prepare(
+        `SELECT revision, encrypted_payload, checksum, device_id, keys_count,
+                created_at, updated_at
+           FROM cloud_snapshots
+          WHERE owner_id = ?
+          LIMIT 1`,
+      ).bind(ownerId);
+
+  const row = await statement.first<SnapshotRow>();
+  if (!row) {
+    return json({ status: "empty", snapshot: null });
+  }
+
+  return json({ status: "ok", snapshot: snapshotResponse(row) });
+}
+
+export async function POST(request: Request) {
+  const ownerId = await authenticatedOwnerId();
+  if (!ownerId) {
+    return json(
+      { error: "Inicie sesión para guardar su respaldo.", code: "AUTH_REQUIRED" },
+      401,
+    );
+  }
+  const database = getDatabase();
+  if (!database) {
+    return json({ error: "El almacenamiento en la nube no está disponible." }, 503);
+  }
+
+  if (!request.headers.get("content-type")?.includes("application/json")) {
+    return json({ error: "El contenido debe enviarse como JSON." }, 415);
+  }
+
+  const contentLength = Number(request.headers.get("content-length") || "0");
+  if (contentLength > MAX_PAYLOAD_CHARS * 1.5) {
+    return json({ error: "El respaldo supera el tamaño permitido." }, 413);
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return json({ error: "El respaldo no contiene JSON válido." }, 400);
+  }
+
+  const encryptedPayload = body.payload;
+  const baseRevision = body.baseRevision;
+  const keysCount = body.keysCount;
+  const deviceId = body.deviceId;
+
+  if (
+    body.encrypted !== true ||
+    typeof encryptedPayload !== "string" ||
+    encryptedPayload.length < 40 ||
+    encryptedPayload.length > MAX_PAYLOAD_CHARS ||
+    !Number.isSafeInteger(baseRevision) ||
+    Number(baseRevision) < 0 ||
+    !Number.isSafeInteger(keysCount) ||
+    Number(keysCount) < 0 ||
+    Number(keysCount) > 100 ||
+    !validDeviceId(deviceId)
+  ) {
+    return json(
+      { error: "El respaldo cifrado no cumple el formato de seguridad." },
+      400,
+    );
+  }
+
+  const current = await database.prepare(
+    "SELECT revision, updated_at FROM cloud_snapshots WHERE owner_id = ? LIMIT 1",
+  )
+    .bind(ownerId)
+    .first<{ revision: number; updated_at: string }>();
+
+  const expectedRevision = current?.revision ?? 0;
+  if (Number(baseRevision) !== expectedRevision) {
+    return json(
+      {
+        error:
+          "Existe una copia más reciente. Revísela antes de volver a guardar.",
+        code: "REVISION_CONFLICT",
+        currentRevision: expectedRevision,
+        updatedAt: current?.updated_at ?? null,
+      },
+      409,
+    );
+  }
+
+  const now = new Date().toISOString();
+  const nextRevision = expectedRevision + 1;
+  const checksum = await sha256(encryptedPayload);
+
+  const snapshotWrite = !current
+    ? database.prepare(
+      `INSERT INTO cloud_snapshots
+        (owner_id, revision, encrypted_payload, checksum, device_id, keys_count, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(owner_id) DO NOTHING`,
+    )
+      .bind(
+        ownerId,
+        nextRevision,
+        encryptedPayload,
+        checksum,
+        deviceId,
+        Number(keysCount),
+        now,
+        now,
+      )
+    : database.prepare(
+      `UPDATE cloud_snapshots
+          SET revision = ?, encrypted_payload = ?, checksum = ?, device_id = ?,
+              keys_count = ?, updated_at = ?
+        WHERE owner_id = ? AND revision = ?`,
+    )
+      .bind(
+        nextRevision,
+        encryptedPayload,
+        checksum,
+        deviceId,
+        Number(keysCount),
+        now,
+        ownerId,
+        expectedRevision,
+      );
+
+  const versionWrite = database.prepare(
+    `INSERT INTO cloud_snapshot_versions
+      (owner_id, revision, encrypted_payload, checksum, device_id, keys_count, created_at)
+     SELECT ?, ?, ?, ?, ?, ?, ?
+      WHERE EXISTS (
+        SELECT 1 FROM cloud_snapshots
+         WHERE owner_id = ? AND revision = ? AND checksum = ? AND updated_at = ?
+      )`,
+  )
+    .bind(
+      ownerId,
+      nextRevision,
+      encryptedPayload,
+      checksum,
+      deviceId,
+      Number(keysCount),
+      now,
+      ownerId,
+      nextRevision,
+      checksum,
+      now,
+    );
+
+  const writeResults = await database.batch([snapshotWrite, versionWrite]);
+  if (!writeResults[0]?.meta.changes || !writeResults[1]?.meta.changes) {
+    return json(
+      {
+        error:
+          "Otra computadora actualizó la nube. Revise la copia más reciente.",
+        code: "REVISION_CONFLICT",
+      },
+      409,
+    );
+  }
+
+  try {
+    await database.prepare(
+      `DELETE FROM cloud_snapshot_versions
+        WHERE owner_id = ?
+          AND revision NOT IN (
+            SELECT revision FROM cloud_snapshot_versions
+             WHERE owner_id = ?
+             ORDER BY revision DESC
+             LIMIT 10
+          )`,
+    )
+      .bind(ownerId, ownerId)
+      .run();
+  } catch (error) {
+    console.warn("No se pudo aplicar la retención de versiones.", error);
+  }
+
+  return json({
+    status: "success",
+    revision: nextRevision,
+    timestamp: now,
+    checksum,
+  });
 }

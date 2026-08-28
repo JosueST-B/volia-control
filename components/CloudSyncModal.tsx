@@ -2,236 +2,259 @@
 
 import { useEffect, useState } from "react";
 import {
-  getCloudConfig,
-  pullFromCloud,
+  applyCloudSnapshot,
+  getCloudState,
+  previewCloudSnapshot,
   pushToCloud,
-  saveCloudConfig,
-  type CloudConfig,
+  type CloudPreview,
+  type CloudState,
 } from "../lib/cloud-sync";
+import styles from "./CloudSyncModal.module.css";
+
+type Notice = {
+  text: string;
+  kind: "info" | "success" | "error";
+  authRequired?: boolean;
+  conflict?: boolean;
+};
+
+function dateTime(value: string | null) {
+  if (!value) return "Nunca";
+  return new Intl.DateTimeFormat("es-EC", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
 
 export default function CloudSyncModal() {
   const [open, setOpen] = useState(false);
-  const [config, setConfig] = useState<CloudConfig>(() => getCloudConfig());
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ text: string; type: "success" | "error" | "info" } | null>(null);
-  const [showKey, setShowKey] = useState(false);
+  const [passphrase, setPassphrase] = useState("");
+  const [showPassphrase, setShowPassphrase] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [state, setState] = useState<CloudState>(() => getCloudState());
+  const [preview, setPreview] = useState<CloudPreview | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
+
+  const close = () => {
+    setPassphrase("");
+    setShowPassphrase(false);
+    setPreview(null);
+    setOpen(false);
+  };
 
   useEffect(() => {
-    const refresh = () => setConfig(getCloudConfig());
+    const refresh = () => setState(getCloudState());
     window.addEventListener("volia-cloud-sync-updated", refresh);
     return () => window.removeEventListener("volia-cloud-sync-updated", refresh);
   }, []);
 
-  // Auto-sync periódica cada 5 minutos si está activa
-  useEffect(() => {
-    if (!config.autoSync) return;
-    const interval = window.setInterval(() => {
-      if (navigator.onLine && config.status !== "syncing") {
-        pushToCloud().catch(() => undefined);
-      }
-    }, 5 * 60 * 1000);
-    return () => window.clearInterval(interval);
-  }, [config.autoSync, config.status]);
-
-  const handlePush = async () => {
-    setLoading(true);
-    setMessage({ text: "Sincronizando y guardando en la nube…", type: "info" });
-    const res = await pushToCloud();
-    setLoading(false);
-    setMessage({ text: res.message, type: res.success ? "success" : "error" });
-    setConfig(getCloudConfig());
+  const runPush = async () => {
+    setBusy(true);
+    setPreview(null);
+    setNotice({ text: "Cifrando y guardando la copia…", kind: "info" });
+    const result = await pushToCloud(passphrase);
+    setBusy(false);
+    setState(getCloudState());
+    setNotice({
+      text: result.message,
+      kind: result.success ? "success" : "error",
+      authRequired: result.authRequired,
+      conflict: result.conflict,
+    });
   };
 
-  const handlePull = async () => {
+  const runPreview = async () => {
+    setBusy(true);
+    setPreview(null);
+    setNotice({ text: "Descargando y verificando la copia…", kind: "info" });
+    const result = await previewCloudSnapshot(passphrase);
+    setBusy(false);
+    setState(getCloudState());
+    setPreview(result.preview || null);
+    setNotice({
+      text: result.message,
+      kind: result.success ? "success" : "error",
+      authRequired: result.authRequired,
+    });
+  };
+
+  const restore = () => {
+    if (!preview) return;
     if (
       !window.confirm(
-        "¿Desea descargar y aplicar los datos más recientes desde la nube? Se actualizará la información en esta computadora."
+        `¿Aplicar la versión ${preview.revision}? Primero se descargará una copia de seguridad de los datos actuales.`,
       )
     )
       return;
-
-    setLoading(true);
-    setMessage({ text: "Descargando datos desde la nube…", type: "info" });
-    const res = await pullFromCloud();
-    setLoading(false);
-    setMessage({ text: res.message, type: res.success ? "success" : "error" });
-    setConfig(getCloudConfig());
-    if (res.success && res.count) {
-      window.setTimeout(() => window.location.reload(), 1200);
-    }
-  };
-
-  const handleSaveConfig = () => {
-    saveCloudConfig(config);
-    setMessage({ text: "Configuración de nube guardada con éxito.", type: "success" });
+    const result = applyCloudSnapshot(preview);
+    setNotice({
+      text: result.message,
+      kind: result.success ? "success" : "error",
+    });
+    if (result.success) window.setTimeout(() => window.location.reload(), 1300);
   };
 
   const statusLabel =
-    config.status === "syncing"
-      ? "Sincronizando…"
-      : config.status === "error"
-      ? "Error en nube"
-      : config.status === "offline"
-      ? "Sin conexión"
-      : config.lastSync
-      ? "Nube activa"
-      : "Nube lista";
-
-  const statusDotClass =
-    config.status === "syncing"
-      ? "yellow"
-      : config.status === "error" || config.status === "offline"
-      ? "red"
-      : config.lastSync
-      ? "green"
-      : "blue";
+    state.status === "syncing"
+      ? "Procesando…"
+      : state.status === "error"
+        ? "Revisión necesaria"
+        : state.status === "offline"
+          ? "Sin conexión"
+          : state.revision > 0
+            ? `Versión ${state.revision}`
+            : "Sin configurar";
 
   return (
     <>
       <button
-        className="cloud-sync-trigger"
+        className={styles.trigger}
         onClick={() => {
-          setConfig(getCloudConfig());
-          setMessage(null);
+          setState(getCloudState());
+          setNotice(null);
+          setPreview(null);
           setOpen(true);
         }}
-        title="Sincronización en la Nube"
       >
-        <span className={`cloud-dot ${statusDotClass}`}></span>
-        <span>☁ Nube: {statusLabel}</span>
+        <span aria-hidden="true">☁</span>
+        Nube · {statusLabel}
       </button>
 
       {open && (
         <div
           className="modal-backdrop"
-          onMouseDown={(event) => event.target === event.currentTarget && setOpen(false)}
+          onMouseDown={(event) =>
+            event.target === event.currentTarget && close()
+          }
         >
           <section
-            className="install-modal cloud-modal"
+            className={`install-modal ${styles.modal}`}
             role="dialog"
             aria-modal="true"
-            aria-label="Sincronización en la Nube"
+            aria-label="Respaldo cifrado en la nube"
           >
             <header>
               <div>
-                <p className="eyebrow">INFRAESTRUCTURA DE SINCRONIZACIÓN</p>
-                <h2>Sincronización en la Nube (Cloud Sync)</h2>
+                <p className="eyebrow">RESPALDO PERSONAL PROTEGIDO</p>
+                <h2>Memoria segura en la nube</h2>
               </div>
-              <button aria-label="Cerrar" onClick={() => setOpen(false)}>
+              <button aria-label="Cerrar" onClick={close}>
                 ×
               </button>
             </header>
 
-            <div className="install-options">
-              <article className="cloud-action-card">
-                <span className="option-number">01</span>
-                <h3>Acciones de Nube</h3>
-                <p>
-                  Sincronice sus cotizaciones, cirugías, finanzas, inventario e
-                  historial entre sus computadoras autorizadas.
-                </p>
-                <div className="inline-actions" style={{ marginTop: "12px" }}>
-                  <button
-                    className="primary-button"
-                    disabled={loading}
-                    onClick={handlePush}
-                  >
-                    {loading ? "Procesando…" : "↑ Subir a la Nube (Push)"}
-                  </button>
-                  <button
-                    className="secondary-button"
-                    disabled={loading}
-                    onClick={handlePull}
-                  >
-                    ↓ Descargar de la Nube (Pull)
-                  </button>
-                </div>
-                <small style={{ display: "block", marginTop: "10px", color: "var(--muted)" }}>
-                  {config.lastSync
-                    ? `Última sincronización: ${new Date(config.lastSync).toLocaleString("es-EC")}`
-                    : "Aún no se ha realizado la primera sincronización."}
-                </small>
-              </article>
+            <div className={styles.securityBanner}>
+              <strong>Sus registros se cifran antes de salir de esta laptop.</strong>
+              <span>
+                La copia queda separada por su cuenta. La clave nunca se guarda
+                ni se envía al servidor.
+              </span>
+            </div>
 
+            <div className={styles.passphrase}>
+              <label htmlFor="cloud-passphrase">Clave privada de la copia</label>
+              <div>
+                <input
+                  id="cloud-passphrase"
+                  type={showPassphrase ? "text" : "password"}
+                  value={passphrase}
+                  minLength={12}
+                  autoComplete="off"
+                  placeholder="Mínimo 12 caracteres"
+                  onChange={(event) => setPassphrase(event.target.value)}
+                />
+                <button
+                  className="secondary-button"
+                  onClick={() => setShowPassphrase((value) => !value)}
+                >
+                  {showPassphrase ? "Ocultar" : "Mostrar"}
+                </button>
+              </div>
+              <small>
+                Utilice la misma clave en sus otras computadoras. Si la pierde,
+                nadie podrá recuperar la copia cifrada.
+              </small>
+            </div>
+
+            <div className={styles.actionGrid}>
+              <article>
+                <span className="option-number">01</span>
+                <h3>Guardar esta laptop</h3>
+                <p>
+                  Crea una nueva versión únicamente si nadie guardó otra más
+                  reciente.
+                </p>
+                <button
+                  className="primary-button"
+                  disabled={busy}
+                  onClick={runPush}
+                >
+                  Guardar copia cifrada
+                </button>
+              </article>
               <article>
                 <span className="option-number">02</span>
-                <h3>Cifrado de Grado Médico (AES-256)</h3>
+                <h3>Revisar antes de restaurar</h3>
                 <p>
-                  Para proteger los datos confidenciales de pacientes, puede establecer
-                  una clave maestra. Los datos se cifrarán en su navegador antes de
-                  enviarse a la red.
+                  Descifra y muestra el resumen sin modificar los registros de
+                  esta computadora.
                 </p>
-                <div className="pin-row" style={{ marginTop: "10px" }}>
-                  <input
-                    type={showKey ? "text" : "password"}
-                    placeholder="Clave de cifrado (opcional)"
-                    value={config.encryptionKey}
-                    onChange={(e) =>
-                      setConfig((c) => ({ ...c, encryptionKey: e.target.value }))
-                    }
-                  />
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={() => setShowKey(!showKey)}
-                  >
-                    {showKey ? "Ocultar" : "Ver"}
-                  </button>
-                </div>
-              </article>
-
-              <article>
-                <span className="option-number">03</span>
-                <h3>Ajustes de Conexión</h3>
-                <p>
-                  Servidor de sincronización y automatización en segundo plano.
-                </p>
-                <div className="business-form" style={{ marginTop: "8px" }}>
-                  <label>
-                    <span>Endpoint de la Nube</span>
-                    <input
-                      type="text"
-                      value={config.endpoint}
-                      placeholder="/api/sync o URL externa"
-                      onChange={(e) =>
-                        setConfig((c) => ({ ...c, endpoint: e.target.value }))
-                      }
-                    />
-                  </label>
-                  <label className="checkbox-row" style={{ marginTop: "10px" }}>
-                    <input
-                      type="checkbox"
-                      checked={config.autoSync}
-                      onChange={(e) =>
-                        setConfig((c) => ({ ...c, autoSync: e.target.checked }))
-                      }
-                    />
-                    <span>
-                      <strong>Sincronización Automática en segundo plano</strong> (cada 5
-                      minutos al detectar conexión)
-                    </span>
-                  </label>
-                </div>
-                <div style={{ marginTop: "12px" }}>
-                  <button className="secondary-button" onClick={handleSaveConfig}>
-                    Guardar ajustes
-                  </button>
-                </div>
+                <button
+                  className="secondary-button"
+                  disabled={busy}
+                  onClick={runPreview}
+                >
+                  Revisar copia disponible
+                </button>
               </article>
             </div>
 
-            {message && (
-              <div className={`install-message ${message.type}`}>
-                {message.text}
+            {preview && (
+              <div className={styles.previewCard}>
+                <div>
+                  <span>Copia verificada</span>
+                  <strong>Versión {preview.revision}</strong>
+                </div>
+                <dl>
+                  <div>
+                    <dt>Guardada</dt>
+                    <dd>{dateTime(preview.updatedAt)}</dd>
+                  </div>
+                  <div>
+                    <dt>Módulos</dt>
+                    <dd>{preview.modulesCount}</dd>
+                  </div>
+                </dl>
+                <button className="primary-button" onClick={restore}>
+                  Aplicar esta copia
+                </button>
+                <small>
+                  Antes de aplicarla, se descargará automáticamente un respaldo
+                  de los datos actuales.
+                </small>
+              </div>
+            )}
+
+            {notice && (
+              <div className={`${styles.notice} ${styles[notice.kind]}`} role="status">
+                <strong>{notice.text}</strong>
+                {notice.authRequired && (
+                  <a href="/signin-with-chatgpt?return_to=%2F" target="_top">
+                    Iniciar sesión para continuar
+                  </a>
+                )}
+                {notice.conflict && (
+                  <span>
+                    Use “Revisar copia disponible”; después podrá decidir qué
+                    información conservar.
+                  </span>
+                )}
               </div>
             )}
 
             <footer>
-              <strong>Seguridad y Respaldo Híbrido</strong>
-              <span>
-                Volia Control mantiene copia local para trabajar sin conexión y
-                sincroniza en la nube para disponibilidad y respaldo centralizado.
-              </span>
+              <strong>Última copia conocida</strong>
+              <span>{dateTime(state.lastSync)}</span>
             </footer>
           </section>
         </div>
