@@ -31,6 +31,20 @@ function getDatabase() {
     .__VOLIA_DB__;
 }
 
+function isAuthorizedOwner(ownerId: string) {
+  const configured = (
+    globalThis as typeof globalThis & {
+      __VOLIA_ALLOWED_OWNER_IDS__?: string;
+    }
+  ).__VOLIA_ALLOWED_OWNER_IDS__;
+  if (!configured) return false;
+  return configured
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .includes(ownerId);
+}
+
 async function authenticatedOwnerId() {
   const user = await getChatGPTUser();
   if (!user) return null;
@@ -84,6 +98,12 @@ export async function GET(request: Request) {
       401,
     );
   }
+  if (!isAuthorizedOwner(ownerId)) {
+    return json(
+      { error: "Su cuenta todavía no está autorizada para usar la nube." },
+      403,
+    );
+  }
   const database = getDatabase();
   if (!database) {
     return json({ error: "El almacenamiento en la nube no está disponible." }, 503);
@@ -123,6 +143,12 @@ export async function POST(request: Request) {
     return json(
       { error: "Inicie sesión para guardar su respaldo.", code: "AUTH_REQUIRED" },
       401,
+    );
+  }
+  if (!isAuthorizedOwner(ownerId)) {
+    return json(
+      { error: "Su cuenta todavía no está autorizada para usar la nube." },
+      403,
     );
   }
   const database = getDatabase();
@@ -176,6 +202,15 @@ export async function POST(request: Request) {
     .first<{ revision: number; updated_at: string }>();
 
   const expectedRevision = current?.revision ?? 0;
+  if (
+    current &&
+    Date.now() - Date.parse(current.updated_at) < 3_000
+  ) {
+    return json(
+      { error: "Espere unos segundos antes de guardar otra copia." },
+      429,
+    );
+  }
   if (Number(baseRevision) !== expectedRevision) {
     return json(
       {
