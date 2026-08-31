@@ -5,6 +5,7 @@ import { createCsv } from "../lib/csv.ts";
 import { businessIsoDate } from "../lib/date-utils.ts";
 import { applyStockMovement } from "../lib/inventory-data.ts";
 import { auditRecognizedText } from "../lib/local-audit.ts";
+import { VOLIA_SYSTEM_PRODUCTS, VOLIA_SYSTEMS } from "../lib/volia-system-catalog.ts";
 
 const stock = {
   id: "test",
@@ -54,4 +55,26 @@ test("auditor reconstructs item totals and IVA from recognized text", () => {
   assert.equal(result.calculations.subtotal, 441.17);
   assert.equal(result.calculations.iva, 66.18);
   assert.equal(result.calculations.total, 507.35);
+});
+
+test("loads the Excel system catalog with editable suggested quantities", () => {
+  assert.equal(VOLIA_SYSTEMS.length, 73);
+  assert.ok(VOLIA_SYSTEM_PRODUCTS.length >= 100);
+
+  const system = VOLIA_SYSTEMS.find((entry) =>
+    entry.name === "SISTEMA DE PLACA EN T 3 ORI CABEZA DE 1,5"
+  );
+  assert.ok(system);
+  assert.deepEqual(
+    system.items.map((item) => [item.code, item.suggestedQuantity, item.unitPrice]),
+    [
+      ["F14AB-PA01329", 1, 300],
+      ["F14DB-PA01029", 5, 25],
+      ["F14CB-PA00484", 3, 30],
+    ],
+  );
+  assert.equal(
+    VOLIA_SYSTEM_PRODUCTS.some((product) => product.description === "#NAME?"),
+    false,
+  );
 });

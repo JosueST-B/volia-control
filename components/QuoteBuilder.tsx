@@ -16,6 +16,12 @@ import {
 import { VOLIA_LOGO_DATA_URL } from "../lib/volia-logo";
 import { getCatalog, type CatalogProduct } from "../lib/product-catalog";
 import { recordActivity } from "../lib/activity-log";
+import {
+  VOLIA_SYSTEM_PRODUCTS,
+  VOLIA_SYSTEMS,
+  type VoliaSystemProduct,
+  type VoliaSystemTemplate,
+} from "../lib/volia-system-catalog";
 
 type QuoteItem = {
   id: string;
@@ -58,6 +64,8 @@ const quoteNumber = (sequence = 1, date = today()) => `VOL-${date.replaceAll("-"
 const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const money = (value: number) => new Intl.NumberFormat("es-EC", { style: "currency", currency: "USD" }).format(Number.isFinite(value) ? value : 0);
 const decimal = (value: string) => Math.max(0, Number(value) || 0);
+const normalizeSearch = (value: string) => value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
+const matchesSearch = (value: string, query: string) => query.split(" ").filter(Boolean).every((term) => normalizeSearch(value).includes(term));
 
 const INITIAL_META: QuoteMeta = {
   number: quoteNumber(), date: today(), validity: 15, customer: "", taxId: "", hospital: "", contact: "", contract: "",
@@ -91,6 +99,45 @@ export default function QuoteBuilder() {
   const [memoryMessage, setMemoryMessage] = useState("");
   const [savedQuotes, setSavedQuotes] = useState<StoredQuote[]>([]);
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
+  const [systemSearch, setSystemSearch] = useState("");
+  const [selectedSystem, setSelectedSystem] = useState<VoliaSystemTemplate | null>(null);
+  const [systemQuantities, setSystemQuantities] = useState<number[]>([]);
+  const [systemMessage, setSystemMessage] = useState("");
+
+  const normalizedSystemSearch = normalizeSearch(systemSearch);
+  const systemMatches = useMemo(() => {
+    if (normalizedSystemSearch.length < 2) return [];
+    return VOLIA_SYSTEMS
+      .filter((system) => matchesSearch([
+        system.name,
+        system.category,
+        system.sourceSheet,
+        ...system.items.flatMap((item) => [item.code, item.description]),
+      ].join(" "), normalizedSystemSearch))
+      .sort((a, b) => {
+        const aStarts = normalizeSearch(a.name).startsWith(normalizedSystemSearch) ? 0 : 1;
+        const bStarts = normalizeSearch(b.name).startsWith(normalizedSystemSearch) ? 0 : 1;
+        return aStarts - bStarts || a.name.localeCompare(b.name, "es");
+      })
+      .slice(0, 8);
+  }, [normalizedSystemSearch]);
+
+  const productMatches = useMemo(() => {
+    if (normalizedSystemSearch.length < 2) return [];
+    return VOLIA_SYSTEM_PRODUCTS
+      .filter((product) => matchesSearch(`${product.code} ${product.description}`, normalizedSystemSearch))
+      .sort((a, b) => {
+        const aExact = normalizeSearch(a.code) === normalizedSystemSearch ? 0 : 1;
+        const bExact = normalizeSearch(b.code) === normalizedSystemSearch ? 0 : 1;
+        return aExact - bExact || a.description.localeCompare(b.description, "es");
+      })
+      .slice(0, 8);
+  }, [normalizedSystemSearch]);
+
+  const selectedSystemTotal = useMemo(() => selectedSystem?.items.reduce(
+    (sum, item, index) => sum + item.unitPrice * (systemQuantities[index] || 0),
+    0,
+  ) || 0, [selectedSystem, systemQuantities]);
 
   useEffect(() => {
     const restoreTimer = window.setTimeout(() => {
@@ -148,6 +195,67 @@ export default function QuoteBuilder() {
     const product = catalog.find((entry) => entry.code === code);
     if (product) updateItem(id, { code: product.code, description: product.description, brand: product.brand, origin: product.origin, unitCost: product.unitCost, unitPrice: product.salePrice });
     else updateItem(id, { code: "", description: "", unitPrice: 0 });
+  };
+
+  const quoteHasOnlyUntouchedExample = (current: QuoteItem[]) => current.length === 1
+    && current[0].id === INITIAL_ITEMS[0].id
+    && current[0].code === INITIAL_ITEMS[0].code
+    && current[0].description === INITIAL_ITEMS[0].description
+    && current[0].quantity === INITIAL_ITEMS[0].quantity
+    && current[0].unitCost === INITIAL_ITEMS[0].unitCost
+    && current[0].unitPrice === INITIAL_ITEMS[0].unitPrice;
+
+  const appendSuggestedItems = (additions: QuoteItem[]) => {
+    setItems((current) => [
+      ...(quoteHasOnlyUntouchedExample(current) ? [] : current),
+      ...additions,
+    ]);
+  };
+
+  const chooseSystem = (system: VoliaSystemTemplate) => {
+    setSelectedSystem(system);
+    setSystemQuantities(system.items.map((item) => item.suggestedQuantity));
+    setSystemMessage("");
+  };
+
+  const addSelectedSystem = () => {
+    if (!selectedSystem) return;
+    const additions = selectedSystem.items.flatMap((item, index) => {
+      const quantity = Math.max(0, Math.floor(systemQuantities[index] || 0));
+      if (!quantity) return [];
+      return [{
+        id: uid(),
+        code: item.code,
+        description: item.description,
+        brand: "",
+        origin: "",
+        quantity,
+        unitCost: 0,
+        unitPrice: item.unitPrice,
+      }];
+    });
+    if (!additions.length) {
+      setSystemMessage("Ingrese al menos una cantidad mayor que cero.");
+      return;
+    }
+    appendSuggestedItems(additions);
+    setSystemMessage(`${selectedSystem.name}: ${additions.length} componente(s) agregados.`);
+    recordActivity("Cotizador", "Sistema agregado desde Excel", `${selectedSystem.name} · ${additions.length} componentes`, "create");
+  };
+
+  const addSuggestedProduct = (product: VoliaSystemProduct) => {
+    appendSuggestedItems([{
+      id: uid(),
+      code: product.code,
+      description: product.description,
+      brand: "",
+      origin: "",
+      quantity: 1,
+      unitCost: 0,
+      unitPrice: product.unitPrice,
+    }]);
+    setSystemMessage(`${product.code} agregado a la cotización.`);
+    recordActivity("Cotizador", "Producto agregado desde Excel", `${product.code} · ${product.description}`, "create");
   };
 
   const addItem = () => setItems((current) => [...current, { id: uid(), code: "", description: "", brand: "", origin: "", quantity: 1, unitCost: 0, unitPrice: 0 }]);
@@ -285,6 +393,40 @@ export default function QuoteBuilder() {
           <section className="quote-card">
             <div className="quote-card-title"><div><span>02</span><div><p className="eyebrow">PRODUCTOS</p><h3>Implantes y consumibles</h3></div></div><button className="quote-link" onClick={addItem}><SmallIcon name="plus" />Agregar línea</button></div>
             <p className="catalog-warning">Los precios precargados son referenciales y provienen de los documentos previamente revisados. Confírmalos contra el contrato vigente.</p>
+            <section className="system-assistant" aria-label="Asistente de sistemas del Excel">
+              <div className="system-assistant-heading">
+                <div><p className="eyebrow">LISTA SISTEMA VOLIA</p><h4>Buscar y rellenar automáticamente</h4><span>Escriba el nombre del sistema, producto o código. El sistema completo mostrará sus componentes y cantidades sugeridas.</span></div>
+                <b>{VOLIA_SYSTEMS.length} sistemas · {VOLIA_SYSTEM_PRODUCTS.length} productos</b>
+              </div>
+              <label className="system-search-field">
+                <span>Buscar por código o nombre</span>
+                <input
+                  value={systemSearch}
+                  onChange={(event) => setSystemSearch(event.target.value)}
+                  placeholder="Ej. placa en T 1,5 o F14AB-PA01329"
+                  autoComplete="off"
+                />
+              </label>
+
+              {normalizedSystemSearch.length >= 2 && <div className="system-suggestions">
+                {systemMatches.length > 0 && <div className="suggestion-group"><strong>Sistemas recomendados</strong>{systemMatches.map((system) => <button type="button" key={system.id} className={selectedSystem?.id === system.id ? "selected" : ""} onClick={() => chooseSystem(system)}><span><b>{system.name}</b><small>{system.category} · {system.items.length} componente(s)</small></span><em>Ver sistema</em></button>)}</div>}
+                {productMatches.length > 0 && <div className="suggestion-group"><strong>Productos por código o nombre</strong>{productMatches.map((product) => <button type="button" key={product.id} onClick={() => addSuggestedProduct(product)}><span><b>{product.code}</b><small>{product.description}</small></span><em>+ {money(product.unitPrice)}</em></button>)}</div>}
+                {!systemMatches.length && !productMatches.length && <p className="system-empty">No se encontró una coincidencia. Puede agregar una línea personalizada debajo.</p>}
+              </div>}
+
+              {selectedSystem && <div className="system-preview">
+                <header><div><span>{selectedSystem.category}</span><h4>{selectedSystem.name}</h4><p>Cantidades sugeridas tomadas de la columna C del Excel. Escriba 0 para excluir un componente.</p></div><button type="button" aria-label="Cerrar sistema seleccionado" onClick={() => setSelectedSystem(null)}>×</button></header>
+                <div className="system-component-list">
+                  {selectedSystem.items.map((component, index) => <div className="system-component" key={`${selectedSystem.id}-${component.code}-${index}`}>
+                    <div><strong>{component.description}</strong><span>{component.code} · {money(component.unitPrice)} por unidad</span></div>
+                    <label><span>Cantidad</span><input type="number" min="0" step="1" value={systemQuantities[index] ?? component.suggestedQuantity} onChange={(event) => setSystemQuantities((current) => current.map((quantity, quantityIndex) => quantityIndex === index ? Math.max(0, Math.floor(decimal(event.target.value))) : quantity))} /></label>
+                    <b>{money(component.unitPrice * (systemQuantities[index] || 0))}</b>
+                  </div>)}
+                </div>
+                <footer><div><span>Total referencial del sistema</span><strong>{money(selectedSystemTotal)}</strong></div><button type="button" className="primary-button" onClick={addSelectedSystem}><SmallIcon name="plus" />Agregar sistema a la cotización</button></footer>
+              </div>}
+              {systemMessage && <p className="system-message" role="status">{systemMessage}</p>}
+            </section>
             <div className="quote-items">
               {items.map((item, index) => {
                 const lineSale = item.quantity * item.unitPrice;

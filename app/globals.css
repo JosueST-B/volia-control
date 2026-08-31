@@ -1293,6 +1293,296 @@ td {
 .catalog-warning .quote-icon {
   width: 15px;
 }
+.system-assistant {
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid #b9d7cf;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f5fbf8 0%, #ffffff 100%);
+}
+.system-assistant-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+.system-assistant-heading h4,
+.system-preview h4 {
+  margin: 2px 0 0;
+  color: #173d34;
+  font-size: 14px;
+}
+.system-assistant-heading > div > span {
+  display: block;
+  max-width: 600px;
+  margin-top: 5px;
+  color: #657d77;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.system-assistant-heading > b {
+  flex: none;
+  padding: 7px 9px;
+  border-radius: 999px;
+  background: #deeee8;
+  color: #216c5a;
+  font-size: 9px;
+}
+.system-search-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.system-search-field > span {
+  color: #506d66;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.system-search-field input {
+  width: 100%;
+  padding: 12px 13px;
+  border: 1px solid #9bc8bc;
+  border-radius: 9px;
+  outline: none;
+  background: white;
+  color: var(--ink);
+  font-size: 12px;
+}
+.system-search-field input:focus {
+  border-color: #3f8c7b;
+  box-shadow: 0 0 0 3px #4d9c8a20;
+}
+.system-suggestions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+.suggestion-group {
+  overflow: hidden;
+  border: 1px solid #d7e5e1;
+  border-radius: 9px;
+  background: white;
+}
+.suggestion-group > strong {
+  display: block;
+  padding: 8px 10px;
+  border-bottom: 1px solid #e4ece9;
+  background: #edf6f2;
+  color: #3e6b61;
+  font-size: 9px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.suggestion-group button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border: 0;
+  border-bottom: 1px solid #edf2f0;
+  background: white;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.suggestion-group button:last-child {
+  border-bottom: 0;
+}
+.suggestion-group button:hover,
+.suggestion-group button.selected {
+  background: #eff8f4;
+}
+.suggestion-group button span,
+.suggestion-group button b,
+.suggestion-group button small {
+  display: block;
+  min-width: 0;
+}
+.suggestion-group button b {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+}
+.suggestion-group button small {
+  overflow: hidden;
+  margin-top: 3px;
+  color: #71847f;
+  font-size: 8px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+}
+.suggestion-group button em {
+  flex: none;
+  color: #237460;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 800;
+}
+.system-empty,
+.system-message {
+  grid-column: 1/-1;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f4f7f6;
+  color: #647873;
+  font-size: 10px;
+}
+.system-preview {
+  overflow: hidden;
+  margin-top: 12px;
+  border: 1px solid #8dbfb2;
+  border-radius: 10px;
+  background: white;
+}
+.system-preview > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 13px 14px;
+  background: #e8f4ef;
+}
+.system-preview > header span {
+  color: #377063;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.system-preview > header p {
+  margin: 5px 0 0;
+  color: #637b75;
+  font-size: 9px;
+}
+.system-preview > header > button {
+  border: 0;
+  background: transparent;
+  color: #4b6e65;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.system-component-list {
+  padding: 4px 13px;
+}
+.system-component {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 88px 92px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #e7eeeb;
+}
+.system-component:last-child {
+  border-bottom: 0;
+}
+.system-component > div strong,
+.system-component > div span {
+  display: block;
+}
+.system-component > div strong {
+  font-size: 10px;
+}
+.system-component > div span {
+  margin-top: 3px;
+  color: #71827e;
+  font-size: 8px;
+}
+.system-component label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.system-component label span {
+  color: #6c817b;
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.system-component input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #c9d9d5;
+  border-radius: 7px;
+  font-size: 11px;
+}
+.system-component > b {
+  color: #1e6152;
+  font-size: 10px;
+  text-align: right;
+}
+.system-preview > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border-top: 1px solid #d9e7e3;
+  background: #f8fbfa;
+}
+.system-preview > footer div span,
+.system-preview > footer div strong {
+  display: block;
+}
+.system-preview > footer div span {
+  color: #687e78;
+  font-size: 8px;
+  text-transform: uppercase;
+}
+.system-preview > footer div strong {
+  margin-top: 3px;
+  color: #194f43;
+  font-size: 14px;
+}
+.system-preview > footer .primary-button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.system-message {
+  margin-top: 10px;
+  background: #e8f4ef;
+  color: #22614f;
+  font-weight: 700;
+}
+@media (max-width: 800px) {
+  .system-suggestions {
+    grid-template-columns: 1fr;
+  }
+  .system-assistant-heading {
+    flex-direction: column;
+  }
+  .system-component {
+    grid-template-columns: minmax(0, 1fr) 80px;
+  }
+  .system-component > b {
+    grid-column: 1/-1;
+    text-align: left;
+  }
+}
+@media (max-width: 650px) {
+  .system-assistant {
+    padding: 12px;
+  }
+  .system-component {
+    grid-template-columns: 1fr;
+  }
+  .system-preview > footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .system-preview > footer .primary-button {
+    justify-content: center;
+    width: 100%;
+  }
+}
 .quote-items {
   display: flex;
   flex-direction: column;
