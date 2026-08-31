@@ -274,6 +274,7 @@ function Icon({
 
 export default function Home() {
   const [module, setModule] = useState<Module>("home");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [state, setState] = useState<AuditState>("ready");
   const [files, setFiles] = useState<File[]>([]);
   const [consent, setConsent] = useState(false);
@@ -285,6 +286,12 @@ export default function Home() {
     () => files.reduce((sum, file) => sum + file.size, 0),
     [files],
   );
+
+  const navigateTo = (target: Module) => {
+    setModule(target);
+    setMobileNavOpen(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const addFiles = (incoming: File[]) => {
     setError("");
@@ -438,7 +445,7 @@ export default function Home() {
 
   return (
     <main className="app-shell">
-      <aside className="sidebar">
+      <aside className={`sidebar ${mobileNavOpen ? "mobile-nav-open" : ""}`}>
         <div className="brand">
           <div className="brand-logo">
             <img
@@ -453,61 +460,71 @@ export default function Home() {
             <small>Control empresarial</small>
           </div>
         </div>
+        <button
+          type="button"
+          className="mobile-menu-toggle"
+          aria-label={mobileNavOpen ? "Cerrar menú" : "Abrir menú"}
+          aria-expanded={mobileNavOpen}
+          onClick={() => setMobileNavOpen((open) => !open)}
+        >
+          <span aria-hidden="true">{mobileNavOpen ? "×" : "☰"}</span>
+          <b>Menú</b>
+        </button>
         <nav aria-label="Navegación principal">
-          <button className={`nav-item ${module === "home" ? "active" : ""}`} onClick={() => setModule("home")}><Icon name="home" />Inicio</button>
+          <button className={`nav-item ${module === "home" ? "active" : ""}`} onClick={() => navigateTo("home")}><Icon name="home" />Inicio</button>
           <button
             className={`nav-item ${module === "audit" ? "active" : ""}`}
-            onClick={() => setModule("audit")}
+            onClick={() => navigateTo("audit")}
           >
             <Icon name="scan" />
             Auditor inteligente
           </button>
           <button
             className={`nav-item ${module === "quote" ? "active" : ""}`}
-            onClick={() => setModule("quote")}
+            onClick={() => navigateTo("quote")}
           >
             <Icon name="file" />
             Cotizador
           </button>
-          <button className={`nav-item ${module === "catalog" ? "active" : ""}`} onClick={() => setModule("catalog")}><Icon name="catalog" />Catálogo maestro</button>
+          <button className={`nav-item ${module === "catalog" ? "active" : ""}`} onClick={() => navigateTo("catalog")}><Icon name="catalog" />Catálogo maestro</button>
           <button
             className={`nav-item ${module === "cases" ? "active" : ""}`}
-            onClick={() => setModule("cases")}
+            onClick={() => navigateTo("cases")}
           >
             <Icon name="cases" />
             Cirugías y cobros
           </button>
           <button
             className={`nav-item ${module === "finance" ? "active" : ""}`}
-            onClick={() => setModule("finance")}
+            onClick={() => navigateTo("finance")}
           >
             <Icon name="finance" />
             Finanzas
           </button>
           <button
             className={`nav-item ${module === "inventory" ? "active" : ""}`}
-            onClick={() => setModule("inventory")}
+            onClick={() => navigateTo("inventory")}
           >
             <Icon name="inventory" />
             Inventario
           </button>
           <button
             className={`nav-item ${module === "analytics" ? "active" : ""}`}
-            onClick={() => setModule("analytics")}
+            onClick={() => navigateTo("analytics")}
           >
             <Icon name="analytics" />
             Estadísticas
           </button>
           <button
             className={`nav-item ${module === "documents" ? "active" : ""}`}
-            onClick={() => setModule("documents")}
+            onClick={() => navigateTo("documents")}
           >
             <Icon name="documents" />
             Documentos
           </button>
           <div className="nav-separator">CONTROL Y AYUDA</div>
-          <button className={`nav-item ${module === "activity" ? "active" : ""}`} onClick={() => setModule("activity")}><Icon name="activity" />Historial</button>
-          <button className={`nav-item ${module === "help" ? "active" : ""}`} onClick={() => setModule("help")}><Icon name="help" />Guía de uso</button>
+          <button className={`nav-item ${module === "activity" ? "active" : ""}`} onClick={() => navigateTo("activity")}><Icon name="activity" />Historial</button>
+          <button className={`nav-item ${module === "help" ? "active" : ""}`} onClick={() => navigateTo("help")}><Icon name="help" />Guía de uso</button>
         </nav>
         <div className="sidebar-foot">
           <div className="security-note">
@@ -528,6 +545,7 @@ export default function Home() {
           </div>
         </div>
       </aside>
+      {mobileNavOpen && <button className="mobile-nav-backdrop" type="button" aria-label="Cerrar menú" onClick={() => setMobileNavOpen(false)} />}
 
       <section className="workspace">
         <header className="topbar">
@@ -537,7 +555,7 @@ export default function Home() {
           </div>
           <div className="topbar-actions">
             <CloudSyncModal />
-            <AccessibilityToolbar onHelp={() => setModule("help")} />
+            <AccessibilityToolbar onHelp={() => navigateTo("help")} />
             <InstallManager />
           </div>
         </header>
@@ -1071,6 +1089,13 @@ export default function Home() {
           )}
         </div>
       </section>
+      <nav className="mobile-bottom-nav" aria-label="Accesos rápidos">
+        <button className={module === "home" ? "active" : ""} onClick={() => navigateTo("home")}><Icon name="home" /><span>Inicio</span></button>
+        <button className={module === "quote" ? "active" : ""} onClick={() => navigateTo("quote")}><Icon name="file" /><span>Cotizar</span></button>
+        <button className={module === "cases" ? "active" : ""} onClick={() => navigateTo("cases")}><Icon name="cases" /><span>Cirugías</span></button>
+        <button className={module === "inventory" ? "active" : ""} onClick={() => navigateTo("inventory")}><Icon name="inventory" /><span>Inventario</span></button>
+        <button className={mobileNavOpen ? "active" : ""} onClick={() => setMobileNavOpen(true)}><span className="more-icon" aria-hidden="true">•••</span><span>Más</span></button>
+      </nav>
     </main>
   );
 }

@@ -360,6 +360,10 @@ export default function QuoteBuilder() {
     recordActivity("Cotizador", "Oferta eliminada", `${saved.number || "Sin número"} · ${saved.customer || "Cliente"}`, "delete");
   };
 
+  const goToSection = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
     <section className="quote-module">
       <div className="quote-hero">
@@ -367,11 +371,17 @@ export default function QuoteBuilder() {
         <div className="draft-state"><span></span>BORRADOR LOCAL AUTOGUARDADO</div>
       </div>
 
+      <nav className="quote-workflow" aria-label="Pasos de la cotización">
+        <button type="button" onClick={() => goToSection("quote-products")}><b>1</b><span><strong>Buscar productos</strong><small>Por sistema, código o nombre</small></span></button>
+        <button type="button" onClick={() => goToSection("quote-customer")}><b>2</b><span><strong>Datos del cliente</strong><small>Paciente, hospital y proceso</small></span></button>
+        <button type="button" onClick={() => goToSection("quote-terms")}><b>3</b><span><strong>Revisar y generar</strong><small>Margen, condiciones y PDF</small></span></button>
+      </nav>
+
       {savedQuotes.length > 0 && <details className="quote-memory"><summary><span>MEMORIA VOLIA</span><strong>{savedQuotes.length} oferta{savedQuotes.length === 1 ? "" : "s"} guardada{savedQuotes.length === 1 ? "" : "s"}</strong></summary><div className="quote-memory-list">{savedQuotes.slice(0, 8).map((saved) => <article key={saved.savedAt}><div><strong>{saved.number || "Oferta sin número"}</strong><span>{saved.customer || "Cliente por definir"} · {saved.date || "Sin fecha"}</span></div><b>{money(saved.total)}</b><button onClick={() => restoreQuote(saved)}>Abrir</button><button className="memory-delete" onClick={() => deleteSavedQuote(saved)}>Eliminar</button></article>)}</div></details>}
 
       <div className="quote-layout">
         <div className="quote-main">
-          <section className="quote-card">
+          <section className="quote-card" id="quote-customer">
             <div className="quote-card-title"><div><span>01</span><div><p className="eyebrow">ENCABEZADO</p><h3>Datos de la oferta comercial</h3></div></div><button className="quote-link" onClick={resetDraft}>Nueva oferta</button></div>
             <div className="quote-form-grid">
               <label><span>N.º de oferta</span><input value={meta.number} onChange={(event) => setField("number", event.target.value)} /></label>
@@ -390,7 +400,7 @@ export default function QuoteBuilder() {
             </div>
           </section>
 
-          <section className="quote-card">
+          <section className="quote-card" id="quote-products">
             <div className="quote-card-title"><div><span>02</span><div><p className="eyebrow">PRODUCTOS</p><h3>Implantes y consumibles</h3></div></div><button className="quote-link" onClick={addItem}><SmallIcon name="plus" />Agregar línea</button></div>
             <p className="catalog-warning">Los precios precargados son referenciales y provienen de los documentos previamente revisados. Confírmalos contra el contrato vigente.</p>
             <section className="system-assistant" aria-label="Asistente de sistemas del Excel">
@@ -451,7 +461,7 @@ export default function QuoteBuilder() {
             <button className="add-line-button" onClick={addItem}><SmallIcon name="plus" />Añadir otro producto</button>
           </section>
 
-          <section className="quote-card">
+          <section className="quote-card" id="quote-terms">
             <div className="quote-card-title"><div><span>03</span><div><p className="eyebrow">CONDICIONES</p><h3>Costos y términos comerciales</h3></div></div></div>
             <div className="commercial-grid">
               <label><span>Costos adicionales sobre compra (%)</span><input type="number" min="0" step="0.1" value={meta.overhead} onChange={(event) => setField("overhead", decimal(event.target.value))} /><small>Flete, importación, logística u otros costos indirectos.</small></label>
