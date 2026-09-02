@@ -15,6 +15,7 @@ import HomeDashboard from "../components/HomeDashboard";
 import ProductCatalog from "../components/ProductCatalog";
 import HelpCenter from "../components/HelpCenter";
 import ActivityCenter from "../components/ActivityCenter";
+import KnowledgeCenter from "../components/KnowledgeCenter";
 import AccessibilityToolbar from "../components/AccessibilityToolbar";
 import {
   exportBusinessPdf,
@@ -37,6 +38,7 @@ type Module =
   | "analytics"
   | "documents"
   | "activity"
+  | "knowledge"
   | "help";
 
 const MODULE_INFO: Record<Module, { eyebrow: string; title: string }> = {
@@ -50,6 +52,7 @@ const MODULE_INFO: Record<Module, { eyebrow: string; title: string }> = {
   analytics: { eyebrow: "ANÁLISIS OPERATIVO", title: "Movimientos y estadísticas" },
   documents: { eyebrow: "GESTIÓN ADMINISTRATIVA", title: "Generador de documentos" },
   activity: { eyebrow: "CONTROL INTERNO", title: "Historial de actividad" },
+  knowledge: { eyebrow: "INTELIGENCIA Y MEMORIA", title: "Memoria y Base de Conocimiento" },
   help: { eyebrow: "ASISTENCIA", title: "Guía de uso de Volia Control" },
 };
 
@@ -171,6 +174,7 @@ function Icon({
     | "home"
     | "catalog"
     | "activity"
+    | "knowledge"
     | "help";
 }) {
   const paths = {
@@ -254,6 +258,7 @@ function Icon({
     home: <><path d="M3 11 12 3l9 8"/><path d="M5 10v11h14V10M9 21v-7h6v7"/></>,
     catalog: <><path d="M4 5h16v16H4zM8 2v6M16 2v6M4 10h16"/><path d="M8 14h8M8 17h5"/></>,
     activity: <><path d="M3 12h4l2-6 4 12 2-6h6"/><path d="M4 3h16v18H4z"/></>,
+    knowledge: <><path d="M12 2a7 7 0 0 0-7 7c0 2.4 1.2 4.5 3 5.7V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.3c1.8-1.2 3-3.3 3-5.7a7 7 0 0 0-7-7z"/><path d="M9 22h6"/></>,
     help: <><circle cx="12" cy="12" r="10"/><path d="M9.8 9a2.4 2.4 0 1 1 3.4 2.2c-.8.4-1.2.9-1.2 1.8M12 17h.01"/></>,
   };
   return (
@@ -523,6 +528,7 @@ export default function Home() {
             Documentos
           </button>
           <div className="nav-separator">CONTROL Y AYUDA</div>
+          <button className={`nav-item ${module === "knowledge" ? "active" : ""}`} onClick={() => navigateTo("knowledge")}><Icon name="knowledge" />Memoria y Reglas</button>
           <button className={`nav-item ${module === "activity" ? "active" : ""}`} onClick={() => navigateTo("activity")}><Icon name="activity" />Historial</button>
           <button className={`nav-item ${module === "help" ? "active" : ""}`} onClick={() => navigateTo("help")}><Icon name="help" />Guía de uso</button>
         </nav>
@@ -630,6 +636,8 @@ export default function Home() {
               <Icon name="documents" />
               Documentos
             </button>
+            <button className={`module-tab ${module === "knowledge" ? "active" : ""}`} onClick={() => setModule("knowledge")} role="tab" aria-selected={module === "knowledge"}><Icon name="knowledge" />Memoria</button>
+            <button className={`module-tab ${module === "activity" ? "active" : ""}`} onClick={() => setModule("activity")} role="tab" aria-selected={module === "activity"}><Icon name="activity" />Historial</button>
             <button className={`module-tab ${module === "help" ? "active" : ""}`} onClick={() => setModule("help")} role="tab" aria-selected={module === "help"}><Icon name="help" />Ayuda</button>
           </div>
           {module === "home" ? (
@@ -1082,6 +1090,8 @@ export default function Home() {
             <MovementAnalytics />
           ) : module === "documents" ? (
             <DocumentGenerator />
+          ) : module === "knowledge" ? (
+            <KnowledgeCenter />
           ) : module === "activity" ? (
             <ActivityCenter />
           ) : (

@@ -10,6 +10,8 @@ export const STORAGE_KEYS = {
   documentHistory: "volia-document-history-v1",
   productCatalog: "volia-product-catalog-v1",
   activityLog: "volia-activity-log-v1",
+  knowledgeMemory: "volia-knowledge-memory-v1",
+  aiSettings: "volia-ai-settings-v1",
   accessibility: "volia-accessibility-v1",
   lastBackup: "volia-last-backup-v1",
   memoryUpdated: "volia-memory-updated-v1",
@@ -63,6 +65,7 @@ export function isValidBackupValue(key: string, value: string) {
       STORAGE_KEYS.documentHistory,
       STORAGE_KEYS.productCatalog,
       STORAGE_KEYS.activityLog,
+      STORAGE_KEYS.knowledgeMemory,
     ]);
     if (arrayKeys.has(key)) return Array.isArray(parsed);
     return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed);

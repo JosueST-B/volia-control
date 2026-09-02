@@ -22,6 +22,7 @@ import {
   type VoliaSystemProduct,
   type VoliaSystemTemplate,
 } from "../lib/volia-system-catalog";
+import { getInsightsForEntity, learnFromQuote } from "../lib/knowledge-memory";
 
 type QuoteItem = {
   id: string;
@@ -316,11 +317,17 @@ export default function QuoteBuilder() {
       savedAt: new Date().toISOString(),
       data: { meta, items, totals },
     });
+    learnFromQuote(meta, items, totals);
     recordActivity("Cotizador", "Oferta guardada", `${meta.number || "Sin número"} · ${meta.customer || "Cliente por definir"} · ${money(totals.total)}`, "create");
     setSavedQuotes(getSavedQuotes());
-    setMemoryMessage("Oferta guardada en Memoria Volia");
+    setMemoryMessage("Oferta guardada y aprendizaje registrado en memoria");
     window.setTimeout(() => setMemoryMessage(""), 2200);
   };
+
+  const entityInsights = useMemo(() => {
+    const target = meta.customer || meta.hospital;
+    return target ? getInsightsForEntity(target) : [];
+  }, [meta.customer, meta.hospital]);
 
   const quotePdfPayload = () => ({
     ...meta,
@@ -398,6 +405,19 @@ export default function QuoteBuilder() {
               <label><span>Fecha de cirugía</span><input type="date" value={meta.surgeryDate} onChange={(event) => setField("surgeryDate", event.target.value)} /></label>
               <label className="wide-field"><span>Médico</span><input placeholder="Nombre del médico" value={meta.doctor} onChange={(event) => setField("doctor", event.target.value)} /></label>
             </div>
+            {entityInsights.length > 0 && (
+              <div className="memory-insight-box" style={{ marginTop: "14px" }}>
+                <div className="insight-header">
+                  <strong>Antecedente y aprendizaje en memoria:</strong>
+                  <span>{entityInsights.length} regla(s) identificada(s)</span>
+                </div>
+                {entityInsights.slice(0, 2).map((ins) => (
+                  <p key={ins.id} className="insight-text">
+                    <strong>[{ins.category.toUpperCase()}] {ins.title}:</strong> {ins.content}
+                  </p>
+                ))}
+              </div>
+            )}
           </section>
 
           <section className="quote-card" id="quote-products">

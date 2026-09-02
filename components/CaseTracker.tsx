@@ -6,6 +6,7 @@ import { downloadCsv } from "../lib/csv";
 import { businessIsoDate } from "../lib/date-utils";
 import { readStoredArray, STORAGE_KEYS, writeStoredJson } from "../lib/storage";
 import { recordActivity } from "../lib/activity-log";
+import { getInsightsForEntity, learnFromCase } from "../lib/knowledge-memory";
 
 type WorkflowStatus = "surgery" | "documents" | "ready" | "submitted" | "review" | "observed" | "approved" | "paid";
 
@@ -109,10 +110,15 @@ export default function CaseTracker() {
     const normalizedDraft = { ...draft, paidAmount: Math.min(draft.amount, draft.paidAmount) };
     const next = { ...normalizedDraft, id: draft.id || uid(), patient: draft.patient.trim().toUpperCase(), status: automaticStatus(normalizedDraft) };
     setRecords((current) => draft.id ? current.map((record) => record.id === draft.id ? next : record) : [next, ...current]);
+    learnFromCase(next);
     recordActivity("Cirugías", draft.id ? "Expediente actualizado" : "Cirugía registrada", `${next.patient} · ${next.invoice || "Sin factura"}`);
     setDraft({ ...EMPTY, surgeryDate: today(), documents: { ...EMPTY.documents } });
     setShowForm(false);
   };
+
+  const hospitalInsights = useMemo(() => {
+    return draft.hospital ? getInsightsForEntity(draft.hospital, "hospital") : [];
+  }, [draft.hospital]);
 
   const setStatus = (id: string, status: WorkflowStatus) => { const target = records.find((record) => record.id === id); setRecords((current) => current.map((record) => record.id === id ? { ...record, status, paidAmount: status === "paid" ? record.amount : record.status === "paid" ? 0 : record.paidAmount } : record)); if (target) recordActivity("Cirugías", "Estado actualizado", `${target.patient} · ${STATUS[status].label}`, "update"); };
   const markDocument = (id: string, key: keyof CaseRecord["documents"]) => {
@@ -164,6 +170,19 @@ export default function CaseTracker() {
         <label><span>Fecha de presentación</span><input type="date" value={draft.submittedDate} onChange={(event) => setDraft({ ...draft, submittedDate: event.target.value })} /></label>
         <label><span>Fecha esperada de pago</span><input type="date" value={draft.dueDate} onChange={(event) => setDraft({ ...draft, dueDate: event.target.value })} /></label>
       </div>
+      {hospitalInsights.length > 0 && (
+        <div className="memory-insight-box" style={{ margin: "10px 0" }}>
+          <div className="insight-header">
+            <strong>Requisitos y antecedentes institucionales ({draft.hospital}):</strong>
+            <span>{hospitalInsights.length} regla(s)</span>
+          </div>
+          {hospitalInsights.slice(0, 2).map((ins) => (
+            <p key={ins.id} className="insight-text">
+              <strong>{ins.title}:</strong> {ins.content}
+            </p>
+          ))}
+        </div>
+      )}
       <div className={`responsible-rule ${draftResponsible.matched ? "matched" : "manual"}`}><span>RESPONSABLE SEGÚN FECHA</span><strong>{draftResponsible.name}</strong><small>{draftResponsible.period}</small></div>
       <div className="document-checks"><span>Documentos recibidos</span><div>{DOCUMENTS.map(([key, label]) => <label key={key}><input type="checkbox" checked={draft.documents[key]} onChange={() => setDraft({ ...draft, documents: { ...draft.documents, [key]: !draft.documents[key] } })} /><span>{label}</span></label>)}</div></div>
       <label className="case-notes"><span>Observaciones</span><textarea value={draft.notes} placeholder="Pendientes, llamadas o aclaraciones" onChange={(event) => setDraft({ ...draft, notes: event.target.value })} /></label>
